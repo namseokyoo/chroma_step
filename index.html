@@ -206,6 +206,9 @@
                     </div>
                     <button id="pause-button">||</button>
                 </div>
+                <div id="invincibility-timer" style="display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(255, 255, 0, 0.9); color: black; padding: 10px 20px; border-radius: 10px; font-size: 1.5rem; font-weight: bold; z-index: 1000;">
+                    무적: <span id="invincibility-countdown">5</span>초
+                </div>
             </div>
             <div id="mission-display" style="display: none;"></div>
             <div id="main-menu" class="ui-panel">
@@ -305,7 +308,7 @@
         };
 
         const EVENT_BLOCK_CONFIG = {
-            SPAWN_PROBABILITY: 0.05, // 5% 확률
+            SPAWN_PROBABILITY: 0.02, // 2% 확률
             TIME_GAIN_AMOUNT: 5,
             TIME_LOSS_AMOUNT: 5,
             INVINCIBILITY_DURATION: 5,
@@ -352,7 +355,7 @@
         
         // 이벤트 블록에 심볼 추가
         function addEventBlockSymbol(tileMesh, eventBlockType) {
-            const symbolGeometry = new THREE.PlaneGeometry(3, 3);
+            const symbolGeometry = new THREE.PlaneGeometry(4, 4); // 크기 증가
             let symbolText = '';
             
             switch(eventBlockType) {
@@ -369,15 +372,25 @@
             
             // 텍스트 텍스처 생성
             const canvas = document.createElement('canvas');
-            canvas.width = 128;
-            canvas.height = 128;
+            canvas.width = 256; // 해상도 증가
+            canvas.height = 256;
             const ctx = canvas.getContext('2d');
             
-            ctx.fillStyle = 'white';
-            ctx.font = 'bold 60px Arial';
+            // 검은색 배경 추가 (대비 향상)
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(0, 0, 256, 256);
+            
+            // 흰색 테두리 추가
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 8;
+            ctx.font = 'bold 120px Arial'; // 폰트 크기 증가
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(symbolText, 64, 64);
+            ctx.strokeText(symbolText, 128, 128);
+            
+            // 흰색 텍스트
+            ctx.fillStyle = 'white';
+            ctx.fillText(symbolText, 128, 128);
             
             const texture = new THREE.CanvasTexture(canvas);
             const symbolMaterial = new THREE.MeshBasicMaterial({ 
@@ -394,19 +407,24 @@
         
         // 이벤트 블록 효과 처리
         function handleEventBlock(eventBlockType) {
+            console.log('이벤트 블록 효과 발동:', eventBlockType); // 디버깅용
+            
             switch(eventBlockType) {
                 case EVENT_BLOCK_TYPES.TIME_GAIN:
                     gameData.time += EVENT_BLOCK_CONFIG.TIME_GAIN_AMOUNT;
+                    console.log('시간 +5초 획득! 현재 시간:', gameData.time);
                     createParticleEffect('time_gain');
                     break;
                 case EVENT_BLOCK_TYPES.TIME_LOSS:
                     gameData.time -= EVENT_BLOCK_CONFIG.TIME_LOSS_AMOUNT;
                     if (gameData.time < 0) gameData.time = 0;
+                    console.log('시간 -5초 손실! 현재 시간:', gameData.time);
                     createParticleEffect('time_loss');
                     break;
                 case EVENT_BLOCK_TYPES.INVINCIBILITY:
                     gameData.isInvincible = true;
                     gameData.invincibilityEndTime = Date.now() + (EVENT_BLOCK_CONFIG.INVINCIBILITY_DURATION * 1000);
+                    console.log('무적 상태 활성화! 5초간 지속');
                     createParticleEffect('invincibility');
                     activateInvincibilityEffect();
                     break;
@@ -415,49 +433,88 @@
         
         // 무적 효과 시각화
         function activateInvincibilityEffect() {
-            if (player) {
-                player.material.emissive.setHex(0xffff00);
-                player.material.emissiveIntensity = 0.5;
+            if (player && player.mesh) {
+                player.mesh.material.emissive.setHex(0xffff00);
+                player.mesh.material.emissiveIntensity = 0.8;
+                console.log('무적 효과 활성화됨'); // 디버깅용
+                
+                // 무적 타이머 UI 표시
+                invincibilityTimer.style.display = 'block';
+                updateInvincibilityTimer();
             }
         }
         
         // 무적 효과 해제
         function deactivateInvincibilityEffect() {
-            if (player) {
-                player.material.emissive.setHex(0x000000);
-                player.material.emissiveIntensity = 0;
+            if (player && player.mesh) {
+                player.mesh.material.emissive.setHex(0x000000);
+                player.mesh.material.emissiveIntensity = 0;
+                console.log('무적 효과 해제됨'); // 디버깅용
+                
+                // 무적 타이머 UI 숨기기
+                invincibilityTimer.style.display = 'none';
+            }
+        }
+        
+        // 무적 타이머 업데이트
+        function updateInvincibilityTimer() {
+            if (gameData.isInvincible) {
+                const remaining = Math.max(0, (gameData.invincibilityEndTime - Date.now()) / 1000);
+                invincibilityCountdown.textContent = Math.ceil(remaining);
+                
+                if (remaining > 0) {
+                    setTimeout(updateInvincibilityTimer, 100);
+                }
             }
         }
         
         // 파티클 효과 생성
         function createParticleEffect(type) {
+            if (!player) return; // 플레이어가 없으면 파티클 생성 안함
+            
             const particleGroup = new THREE.Group();
-            const particleCount = 20;
+            const particleCount = 30; // 파티클 개수 증가
             
             for (let i = 0; i < particleCount; i++) {
-                const particleGeometry = new THREE.SphereGeometry(0.1, 8, 8);
+                const particleGeometry = new THREE.SphereGeometry(0.3, 8, 8); // 크기 증가
                 let particleMaterial;
                 
                 switch(type) {
                     case 'time_gain':
-                        particleMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00, transparent: true });
+                        particleMaterial = new THREE.MeshBasicMaterial({ 
+                            color: 0x00ff00, 
+                            transparent: true,
+                            emissive: 0x00ff00,
+                            emissiveIntensity: 0.5
+                        });
                         break;
                     case 'time_loss':
-                        particleMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true });
+                        particleMaterial = new THREE.MeshBasicMaterial({ 
+                            color: 0xff0000, 
+                            transparent: true,
+                            emissive: 0xff0000,
+                            emissiveIntensity: 0.5
+                        });
                         break;
                     case 'invincibility':
-                        particleMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00, transparent: true });
+                        particleMaterial = new THREE.MeshBasicMaterial({ 
+                            color: 0xffff00, 
+                            transparent: true,
+                            emissive: 0xffff00,
+                            emissiveIntensity: 0.5
+                        });
                         break;
                 }
                 
                 const particle = new THREE.Mesh(particleGeometry, particleMaterial);
-                particle.position.copy(player.position);
+                particle.position.copy(player.mesh.position); // player.mesh.position 사용
+                particle.position.y += 2; // 플레이어 위쪽에서 시작
                 particle.velocity = new THREE.Vector3(
-                    (Math.random() - 0.5) * 10,
-                    Math.random() * 5,
-                    (Math.random() - 0.5) * 10
+                    (Math.random() - 0.5) * 15,
+                    Math.random() * 8 + 2,
+                    (Math.random() - 0.5) * 15
                 );
-                particle.life = 1.0;
+                particle.life = 2.0; // 수명 증가
                 particleGroup.add(particle);
             }
             
@@ -466,10 +523,10 @@
             // 파티클 애니메이션
             const animateParticles = () => {
                 particleGroup.children.forEach(particle => {
-                    particle.position.add(particle.velocity.clone().multiplyScalar(0.02));
-                    particle.velocity.y -= 0.2; // 중력
-                    particle.life -= 0.02;
-                    particle.material.opacity = particle.life;
+                    particle.position.add(particle.velocity.clone().multiplyScalar(0.03));
+                    particle.velocity.y -= 0.3; // 중력 증가
+                    particle.life -= 0.03;
+                    particle.material.opacity = particle.life / 2.0;
                     
                     if (particle.life <= 0) {
                         particleGroup.remove(particle);
@@ -502,6 +559,8 @@
         const newHighScoreBadge = gameOverPanel.querySelector('.new-highscore');
         const virtualKeyboard = document.getElementById('virtual-keyboard');
         const keyboardToggle = document.getElementById('virtual-keyboard-toggle');
+        const invincibilityTimer = document.getElementById('invincibility-timer');
+        const invincibilityCountdown = document.getElementById('invincibility-countdown');
 
         function init() {
             scene.background = new THREE.Color(0x121212);
@@ -1087,41 +1146,23 @@
             tile.mesh.castShadow = false;
 
             const reactivationTimeout = setTimeout(() => {
-                // 이벤트 블록인 경우 새로운 이벤트 블록 생성 체크
-                const eventBlockType = shouldCreateEventBlock();
+                // 특수블록이든 일반블록이든 재활성화시 항상 일반 블록으로 복원
+                tile.eventBlockType = null;
+                tile.mesh.material.emissive.setHex(0x000000);
+                tile.mesh.material.emissiveIntensity = 0;
                 
-                if (eventBlockType) {
-                    tile.eventBlockType = eventBlockType;
-                    tile.mesh.material.color.set(EVENT_BLOCK_CONFIG.COLORS[eventBlockType]);
-                    tile.mesh.material.emissive.setHex(EVENT_BLOCK_CONFIG.COLORS[eventBlockType]);
-                    tile.mesh.material.emissiveIntensity = 0.3;
-                    
-                    // 기존 심볼 제거
-                    if (tile.mesh.children.length > 0) {
-                        tile.mesh.children.forEach(child => tile.mesh.remove(child));
-                    }
-                    
-                    // 새 심볼 추가
-                    addEventBlockSymbol(tile.mesh, eventBlockType);
-                } else {
-                    // 일반 블록으로 복원
-                    tile.eventBlockType = null;
-                    tile.mesh.material.emissive.setHex(0x000000);
-                    tile.mesh.material.emissiveIntensity = 0;
-                    
-                    // 기존 심볼 제거
-                    if (tile.mesh.children.length > 0) {
-                        tile.mesh.children.forEach(child => tile.mesh.remove(child));
-                    }
-                    
-                    let newColorIndex;
-                    do {
-                        newColorIndex = Math.floor(Math.random() * currentThemeColors.length);
-                    } while (gameData.currentMission.includes(newColorIndex));
-                    
-                    tile.colorIndex = newColorIndex;
-                    tile.mesh.material.color.set(currentThemeColors[newColorIndex]);
+                // 기존 심볼 제거
+                if (tile.mesh.children.length > 0) {
+                    tile.mesh.children.forEach(child => tile.mesh.remove(child));
                 }
+                
+                let newColorIndex;
+                do {
+                    newColorIndex = Math.floor(Math.random() * currentThemeColors.length);
+                } while (gameData.currentMission.includes(newColorIndex));
+                
+                tile.colorIndex = newColorIndex;
+                tile.mesh.material.color.set(currentThemeColors[newColorIndex]);
                 
                 tile.isDeactivated = false;
                 tile.targetY = 0;
