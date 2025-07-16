@@ -206,7 +206,7 @@
                     </div>
                     <button id="pause-button">||</button>
                 </div>
-                <div id="invincibility-timer" style="display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(255, 255, 0, 0.9); color: black; padding: 10px 20px; border-radius: 10px; font-size: 1.5rem; font-weight: bold; z-index: 1000;">
+                <div id="invincibility-timer" style="display: none; position: absolute; top: 80px; right: 20px; background: rgba(255, 255, 0, 0.9); color: black; padding: 8px 16px; border-radius: 8px; font-size: 1.2rem; font-weight: bold; z-index: 1000;">
                     무적: <span id="invincibility-countdown">5</span>초
                 </div>
             </div>
@@ -951,16 +951,8 @@
             
             if (currentTile && !currentTile.isDeactivated) {
                 handleStepOnTile(currentTile);
-            } else if (currentTile && currentTile.isDeactivated && gameData.isInvincible) {
-                // 무적 상태에서 비활성화된 블록 위에 있을 때 시각적 피드백
-                const originalColor = currentTile.mesh.material.color.getHex();
-                currentTile.mesh.material.color.setHex(0xffff00); // 노란색으로 깜빡임
-                setTimeout(() => {
-                    if (currentTile.mesh && currentTile.mesh.material) {
-                        currentTile.mesh.material.color.setHex(originalColor);
-                    }
-                }, 200);
             }
+            // 무적 상태에서 비활성화된 블록 위에 있을 때는 아무 효과 없음
         }
 
         function handleStepOnTile(tile) {
