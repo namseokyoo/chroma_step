@@ -215,6 +215,7 @@
         };
         
         let player, clock = new THREE.Clock(), tiles = new Map(), directionalLight;
+        let frameCounter = 0; // 성능 최적화용 프레임 카운터
 
         const hud = document.getElementById('hud');
         const mainMenu = document.getElementById('main-menu');
@@ -352,6 +353,16 @@
             currentThemeColors = COLOR_THEMES[gameSettings.theme];
         }
 
+        function clearAllTimeouts() {
+            // 모든 타일의 타임아웃을 정리
+            for (const tile of tiles.values()) {
+                if (tile.reactivationTimeout) {
+                    clearTimeout(tile.reactivationTimeout);
+                    tile.reactivationTimeout = null;
+                }
+            }
+        }
+
         function startGame() {
             mainMenu.style.display = 'none';
             gameOverPanel.style.display = 'none';
@@ -365,6 +376,9 @@
             gameData.combo = 1;
             gameData.currentMission = [];
             
+            // 메모리 누수 방지: 모든 타임아웃 정리
+            clearAllTimeouts();
+            
             tiles.forEach(tile => scene.remove(tile.mesh));
             tiles.clear();
             if (player) scene.remove(player.mesh);
@@ -377,8 +391,7 @@
             for (let i = 0; i < 3; i++) {
                 addNewMission();
             }
-            updateWorld();
-            ensureMissionTileExists();
+            updateWorld(); // 이미 ensureMissionTileExists를 호출함
             
             const startTile = tiles.get('0,0');
             if (startTile && startTile.colorIndex === gameData.currentMission[0]) {
@@ -395,6 +408,10 @@
 
         function gameOver() {
             gameState = 'GAMEOVER';
+            
+            // 메모리 누수 방지: 모든 타임아웃 정리
+            clearAllTimeouts();
+            
             hud.style.display = 'none';
             missionDisplay.style.display = 'none';
             gameOverPanel.style.display = 'flex';
@@ -496,18 +513,23 @@
                 const missionIcon = missionDisplay.firstChild;
                 if (missionIcon) {
                     missionIcon.classList.add('mission-success-anim');
+                    // 애니메이션 완료 후 아이콘 제거
+                    setTimeout(() => {
+                        if (missionIcon.parentNode) {
+                            missionIcon.remove();
+                        }
+                    }, 500);
                 }
 
                 gameData.score += Math.round(GAME_CONFIG.BASE_SCORE_PER_TILE * (1.0 + (gameData.combo - 1) * GAME_CONFIG.COMBO_MULTIPLIER));
                 gameData.combo++;
                 gameData.time += GAME_CONFIG.TIME_REWARD_BASE;
                 
-                setTimeout(() => {
-                    gameData.currentMission.shift();
-                    addNewMission();
-                    ensureMissionTileExists();
-                    updateMissionUI();
-                }, 400);
+                // 레이스 컨디션 수정: 즉시 미션 업데이트
+                gameData.currentMission.shift();
+                addNewMission();
+                ensureMissionTileExists();
+                updateMissionUI();
             } else {
                 gameData.combo = 1;
                 gameData.time -= GAME_CONFIG.TIME_PENALTY_PER_MOVE;
@@ -535,24 +557,50 @@
             }
 
             if (!missionTileExists) {
-                const candidateTiles = [];
+                // 접근 가능한 타일을 우선적으로 선택 (플레이어 주변 타일)
+                const accessibleTiles = [];
+                const nearbyTiles = [];
+                
                 for (const tile of tiles.values()) {
                     if (tile.colorIndex !== nextMissionIndex && !tile.isDeactivated) {
-                        candidateTiles.push(tile);
+                        const distance = Math.sqrt((tile.gridX - player.gridX)**2 + (tile.gridY - player.gridY)**2);
+                        
+                        // 플레이어와 인접한 타일 (거리 1-2)
+                        if (distance <= 2 && distance > 0) {
+                            accessibleTiles.push(tile);
+                        } 
+                        // 그 외 근처 타일 (거리 3-5)
+                        else if (distance <= 5 && distance > 2) {
+                            nearbyTiles.push(tile);
+                        }
                     }
                 }
 
-                if (candidateTiles.length > 0) {
-                    const targetTile = candidateTiles[Math.floor(Math.random() * candidateTiles.length)];
+                let targetTile = null;
+                
+                // 1순위: 접근 가능한 타일
+                if (accessibleTiles.length > 0) {
+                    targetTile = accessibleTiles[Math.floor(Math.random() * accessibleTiles.length)];
+                } 
+                // 2순위: 근처 타일
+                else if (nearbyTiles.length > 0) {
+                    targetTile = nearbyTiles[Math.floor(Math.random() * nearbyTiles.length)];
+                } 
+                // 3순위: 아무 타일
+                else {
+                    const allTiles = Array.from(tiles.values()).filter(t => 
+                        !t.isDeactivated && 
+                        t.colorIndex !== nextMissionIndex &&
+                        (t.gridX !== player.gridX || t.gridY !== player.gridY)
+                    );
+                    if (allTiles.length > 0) {
+                        targetTile = allTiles[Math.floor(Math.random() * allTiles.length)];
+                    }
+                }
+
+                if (targetTile) {
                     targetTile.colorIndex = nextMissionIndex;
                     targetTile.mesh.material.color.set(currentThemeColors[nextMissionIndex]);
-                } else {
-                    const allTiles = Array.from(tiles.values()).filter(t => !t.isDeactivated && (t.gridX !== player.gridX || t.gridY !== player.gridY));
-                    if (allTiles.length > 0) {
-                        const targetTile = allTiles[Math.floor(Math.random() * allTiles.length)];
-                        targetTile.colorIndex = nextMissionIndex;
-                        targetTile.mesh.material.color.set(currentThemeColors[nextMissionIndex]);
-                    }
                 }
             }
         }
@@ -578,9 +626,20 @@
             for (const [key, tile] of tiles.entries()) {
                 const dist = Math.sqrt((tile.gridX - centerX)**2 + (tile.gridY - centerY)**2);
                 if (dist > radius + 3) {
+                    // 메모리 누수 방지: 타임아웃 정리
+                    if (tile.reactivationTimeout) {
+                        clearTimeout(tile.reactivationTimeout);
+                        tile.reactivationTimeout = null;
+                    }
                     scene.remove(tile.mesh);
                     tiles.delete(key);
                 }
+            }
+            
+            // 성능 최적화: 매 10프레임마다 미션 타일 체크
+            frameCounter++;
+            if (frameCounter % 10 === 0) {
+                ensureMissionTileExists();
             }
         }
 
@@ -612,24 +671,37 @@
             tile.mesh.material.color.set(DEACTIVATED_COLOR);
             tile.mesh.castShadow = false;
 
-            setTimeout(() => {
+            const reactivationTimeout = setTimeout(() => {
                 let newColorIndex;
                 do {
                     newColorIndex = Math.floor(Math.random() * currentThemeColors.length);
-                } while (newColorIndex === gameData.currentMission[0]);
+                } while (gameData.currentMission.includes(newColorIndex));
                 
                 tile.colorIndex = newColorIndex;
                 tile.mesh.material.color.set(currentThemeColors[newColorIndex]);
                 tile.isDeactivated = false;
                 tile.targetY = 0;
                 tile.mesh.castShadow = true;
+                
+                // 타임아웃 참조 제거
+                tile.reactivationTimeout = null;
             }, GAME_CONFIG.TILE_RESPAWN_TIME);
+            
+            // 메모리 누수 방지를 위한 타임아웃 참조 저장
+            tile.reactivationTimeout = reactivationTimeout;
         }
 
         function updateTiles() {
             for (const tile of tiles.values()) {
                 if (tile.mesh.position.y !== tile.targetY) {
-                    tile.mesh.position.y = THREE.MathUtils.lerp(tile.mesh.position.y, tile.targetY, 0.1);
+                    const newY = THREE.MathUtils.lerp(tile.mesh.position.y, tile.targetY, 0.1);
+                    
+                    // 성능 최적화: 목표 위치에 충분히 가까우면 정확한 위치로 설정
+                    if (Math.abs(newY - tile.targetY) < 0.01) {
+                        tile.mesh.position.y = tile.targetY;
+                    } else {
+                        tile.mesh.position.y = newY;
+                    }
                 }
             }
         }
