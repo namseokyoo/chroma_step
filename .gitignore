@@ -1,0 +1,4 @@
+dev-log.md
+.DS_Store
+node_modules/
+.env 

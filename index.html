@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>크로마 스텝 (Chroma Step) - MVP v2.6</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap');
+        
+        :root {
+            --color-bg: #121212; --color-text: #e0e0e0; --color-ui-bg: #1e1e1e;
+            --color-cyan: #18ffff; --color-yellow: #ffc400;
+        }
+
+        body {
+            margin: 0; padding: 0; font-family: 'Noto Sans KR', sans-serif;
+            background-color: var(--color-bg); color: var(--color-text);
+            display: flex; justify-content: center; align-items: center;
+            width: 100vw; height: 100vh; overflow: hidden;
+        }
+
+        #game-container {
+            width: 100%; max-width: 1000px; height: 100%;
+            display: flex; flex-direction: column; justify-content: center;
+            align-items: center; position: relative;
+        }
+
+        #canvas-container {
+            width: 100%; height: 80%; background-color: #000;
+            border-radius: 16px; box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+            position: relative;
+        }
+
+        canvas { display: block; width: 100%; height: 100%; border-radius: 16px; }
+        
+        .ui-panel {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(18, 18, 18, 0.95); display: flex;
+            flex-direction: column; justify-content: center; align-items: center;
+            z-index: 10; border-radius: 16px; text-align: center;
+            padding: 20px; box-sizing: border-box; animation: fadeIn 0.5s ease-in-out;
+        }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .ui-panel h1 { font-size: 3rem; margin-bottom: 10px; letter-spacing: 2px; text-shadow: 0 0 10px var(--color-cyan); }
+        .ui-panel p { font-size: 1.2rem; margin-bottom: 30px; }
+
+        .ui-button {
+            padding: 15px 30px; font-size: 1.2rem; font-weight: 700;
+            color: var(--color-bg); background-color: var(--color-cyan);
+            border: none; border-radius: 50px; cursor: pointer;
+            transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(24, 255, 255, 0.3);
+            margin: 5px;
+        }
+        .ui-button:hover { transform: translateY(-3px); box-shadow: 0 8px 25px rgba(24, 255, 255, 0.5); }
+        
+        #game-over-panel .stats { margin: 20px 0; font-size: 1.5rem; }
+        #game-over-panel .new-highscore { color: var(--color-yellow); animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+
+        #hud {
+            width: 100%; padding: 20px; box-sizing: border-box; position: absolute;
+            top: 0; left: 0; z-index: 5; display: flex; justify-content: space-between;
+            align-items: flex-start;
+        }
+        .hud-group { background-color: rgba(30, 30, 30, 0.8); padding: 10px 20px; border-radius: 12px; backdrop-filter: blur(5px); }
+        #score-display, #combo-display { font-size: 1.5rem; font-weight: 700; }
+        #combo-display { color: #ffab40; }
+        #time-bar-container { width: 100%; height: 10px; background-color: rgba(255,255,255,0.2); border-radius: 5px; margin-top: 5px; }
+        #time-bar { width: 100%; height: 100%; background-color: #69f0ae; border-radius: 5px; transition: width 0.1s linear; }
+        #mission-display {
+            display: flex; gap: 8px; padding: 10px; background-color: rgba(30, 30, 30, 0.8);
+            border-radius: 12px; backdrop-filter: blur(5px); position: absolute;
+            top: 20px; left: 50%; transform: translateX(-50%); pointer-events: none;
+        }
+        .mission-color {
+            width: 30px; height: 30px; border-radius: 50%; border: 3px solid var(--color-text);
+            transition: all 0.3s ease;
+        }
+        .mission-color.current { transform: scale(1.2); box-shadow: 0 0 15px #fff; }
+        .mission-success-anim { animation: missionSuccess 0.5s ease-in-out; }
+        @keyframes missionSuccess {
+            0% { transform: scale(1.2); box-shadow: 0 0 15px #fff; }
+            50% { transform: scale(1.5); box-shadow: 0 0 25px var(--color-yellow); }
+            100% { transform: scale(0); opacity: 0; }
+        }
+
+        #pause-button {
+            background-color: rgba(30, 30, 30, 0.8); backdrop-filter: blur(5px);
+            border: 2px solid var(--color-text); color: var(--color-text);
+            width: 50px; height: 50px; font-size: 1.5rem;
+            border-radius: 50%; cursor: pointer;
+            margin-left: 15px;
+        }
+
+        #settings-panel .theme-container {
+            display: flex; flex-direction: column; align-items: center;
+            gap: 15px; width: 100%; max-width: 400px;
+        }
+        .theme-option { display: flex; align-items: center; width: 100%; }
+        .theme-button {
+            flex-grow: 1; text-align: left; border: 2px solid var(--color-text);
+            background-color: transparent; color: var(--color-text);
+        }
+        .theme-button.selected {
+            border-color: var(--color-cyan); background-color: rgba(24, 255, 255, 0.2);
+            box-shadow: 0 0 15px rgba(24, 255, 255, 0.5);
+        }
+        .theme-preview { display: flex; margin-left: 15px; }
+        .theme-swatch {
+            width: 20px; height: 20px; border-radius: 50%;
+            margin-left: -5px; border: 2px solid var(--color-bg);
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="canvas-container">
+            <canvas id="game-canvas"></canvas>
+            <div id="hud" style="display: none;">
+                <div class="hud-group">
+                    <div id="score-display">Score: 0</div>
+                    <div id="combo-display">Combo: x1.0</div>
+                </div>
+                <div class="hud-group" style="display: flex; align-items: center;">
+                    <div>
+                        <div id="time-display">Time: 60.0</div>
+                        <div id="time-bar-container"><div id="time-bar"></div></div>
+                    </div>
+                    <button id="pause-button">||</button>
+                </div>
+            </div>
+            <div id="mission-display" style="display: none;"></div>
+            <div id="main-menu" class="ui-panel">
+                <h1>크로마 스텝</h1>
+                <p>빛의 멜로디를 따라 색색의 발판을 밟아보세요.</p>
+                <p style="font-size: 1rem;">High Score: <span id="high-score">0</span></p>
+                <div>
+                    <button id="start-button" class="ui-button">게임 시작</button>
+                    <button id="settings-button" class="ui-button">설정</button>
+                </div>
+            </div>
+            <div id="game-over-panel" class="ui-panel" style="display: none;">
+                <h1>GAME OVER</h1>
+                <div class="stats">
+                    <p>Final Score: <span id="final-score">0</span></p>
+                    <p class="new-highscore" style="display: none;">NEW HIGH SCORE!</p>
+                    <p>Color Sparks: +<span id="sparks-earned">0</span></p>
+                </div>
+                <button id="restart-button" class="ui-button">다시 시작</button>
+            </div>
+            <div id="settings-panel" class="ui-panel" style="display: none;">
+                <h1>색상 테마</h1>
+                <div id="theme-container" class="theme-container"></div>
+                <button id="back-to-menu-button" class="ui-button">뒤로 가기</button>
+            </div>
+            <div id="pause-panel" class="ui-panel" style="display: none;">
+                <h1>일시정지</h1>
+                <button id="resume-button" class="ui-button">계속하기</button>
+                <button id="home-button" class="ui-button">홈으로</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // --- 크로마 스텝 MVP 스크립트 ---
+        // 기획서 버전 1.2 기반 / 수정사항 v2.6 (Color Fix)
+        
+        const scene = new THREE.Scene();
+        const canvas = document.querySelector('#game-canvas');
+        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+
+        const camera = new THREE.OrthographicCamera(
+            canvas.clientWidth / -2, canvas.clientWidth / 2,
+            canvas.clientHeight / 2, canvas.clientHeight / -2,
+            1, 1000
+        );
+        const cameraTarget = new THREE.Vector3(0, 0, 0);
+        camera.position.set(0, 60, 60); 
+        camera.lookAt(cameraTarget);
+
+        // *** 수정: 색상 테마 개편 ***
+        const COLOR_THEMES = {
+            '선명한 무지개': [0xf44336, 0xff9800, 0xffeb3b, 0x4caf50, 0x2196f3, 0x3f51b5, 0x9c27b0],
+            '네온의 꿈': [0xf06292, 0x4fc3f7, 0xffee58, 0x81c784, 0xba68c8, 0xff8a65, 0x4dd0e1],
+            '사이버펑크 네온': [0xff00ff, 0x00ffff, 0x00ff00, 0xffff00, 0xff00aa, 0x00aaff, 0xaa00ff],
+            '파스텔 정원': [0xef9a9a, 0xa5d6a7, 0xffcc80, 0x90caf9, 0xce93d8, 0xf48fb1, 0x80cbc4]
+        };
+        const DEACTIVATED_COLOR = 0x424242;
+        let currentThemeColors = [];
+
+        const GAME_CONFIG = {
+            INITIAL_TIME: 60, BASE_SCORE_PER_TILE: 100,
+            COMBO_MULTIPLIER: 0.1, MAX_COMBO_BONUS: 3.0,
+            TIME_REWARD_BASE: 2,
+            TILE_SIZE: 5, TILE_GAP: 1, GRID_RADIUS: 15, 
+            TILE_RESPAWN_TIME: 5000,
+            TIME_PENALTY_PER_MOVE: 0.5,
+        };
+        
+        let gameState = 'MENU';
+        let gameData = {
+            score: 0, time: GAME_CONFIG.INITIAL_TIME, combo: 1,
+            currentMission: [],
+            highScore: 0, colorSparks: 0,
+        };
+        let gameSettings = {
+            theme: '선명한 무지개'
+        };
+        
+        let player, clock = new THREE.Clock(), tiles = new Map(), directionalLight;
+
+        const hud = document.getElementById('hud');
+        const mainMenu = document.getElementById('main-menu');
+        const gameOverPanel = document.getElementById('game-over-panel');
+        const settingsPanel = document.getElementById('settings-panel');
+        const pausePanel = document.getElementById('pause-panel');
+        const scoreDisplay = document.getElementById('score-display');
+        const comboDisplay = document.getElementById('combo-display');
+        const timeDisplay = document.getElementById('time-display');
+        const timeBar = document.getElementById('time-bar');
+        const missionDisplay = document.getElementById('mission-display');
+        const highScoreDisplay = document.getElementById('high-score');
+        const finalScoreDisplay = document.getElementById('final-score');
+        const sparksEarnedDisplay = document.getElementById('sparks-earned');
+        const newHighScoreBadge = gameOverPanel.querySelector('.new-highscore');
+
+        function init() {
+            scene.background = new THREE.Color(0x121212);
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+            scene.add(ambientLight);
+
+            directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(30, 50, 20);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.camera.top = 100;
+            directionalLight.shadow.camera.bottom = -100;
+            directionalLight.shadow.camera.left = -100;
+            directionalLight.shadow.camera.right = 100;
+            directionalLight.shadow.camera.near = 1;
+            directionalLight.shadow.camera.far = 200;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            scene.add(directionalLight);
+            scene.add(directionalLight.target);
+
+            const groundGeometry = new THREE.PlaneGeometry(5000, 5000);
+            const groundMaterial = new THREE.ShadowMaterial({ opacity: 0.3 });
+            const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+            ground.rotation.x = -Math.PI / 2;
+            ground.position.y = -0.51;
+            ground.receiveShadow = true;
+            scene.add(ground);
+
+            loadGameData();
+            setupSettingsPanel();
+            applyTheme();
+
+            document.getElementById('start-button').addEventListener('click', startGame);
+            document.getElementById('settings-button').addEventListener('click', showSettingsPanel);
+            document.getElementById('back-to-menu-button').addEventListener('click', showMainMenu);
+            document.getElementById('restart-button').addEventListener('click', startGame);
+            document.getElementById('pause-button').addEventListener('click', togglePause);
+            document.getElementById('resume-button').addEventListener('click', togglePause);
+            document.getElementById('home-button').addEventListener('click', goHome);
+            window.addEventListener('keydown', handleInput);
+            window.addEventListener('resize', onWindowResize);
+
+            onWindowResize();
+            animate();
+        }
+
+        function onWindowResize() {
+            const container = document.getElementById('canvas-container');
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+            renderer.setSize(width, height);
+            const zoom = 0.025; 
+            camera.left = -width * zoom; camera.right = width * zoom;
+            camera.top = height * zoom; camera.bottom = -height * zoom;
+            camera.updateProjectionMatrix();
+        }
+
+        function loadGameData() {
+            const savedData = localStorage.getItem('chromaStepData');
+            if (savedData) {
+                const parsed = JSON.parse(savedData);
+                gameData.highScore = parsed.highScore || 0;
+                gameData.colorSparks = parsed.colorSparks || 0;
+                gameSettings.theme = parsed.theme || '선명한 무지개';
+            }
+        }
+
+        function saveGameData() {
+            localStorage.setItem('chromaStepData', JSON.stringify({
+                highScore: gameData.highScore,
+                colorSparks: gameData.colorSparks,
+                theme: gameSettings.theme
+            }));
+        }
+
+        function showSettingsPanel() {
+            mainMenu.style.display = 'none';
+            settingsPanel.style.display = 'flex';
+        }
+        function showMainMenu() {
+            settingsPanel.style.display = 'none';
+            mainMenu.style.display = 'flex';
+        }
+        function setupSettingsPanel() {
+            const container = document.getElementById('theme-container');
+            container.innerHTML = '';
+            Object.keys(COLOR_THEMES).forEach(themeName => {
+                const optionDiv = document.createElement('div');
+                optionDiv.className = 'theme-option';
+
+                const button = document.createElement('button');
+                button.className = 'ui-button theme-button';
+                button.textContent = themeName;
+                if (themeName === gameSettings.theme) {
+                    button.classList.add('selected');
+                }
+                button.addEventListener('click', () => {
+                    gameSettings.theme = themeName;
+                    applyTheme();
+                    saveGameData();
+                    container.querySelectorAll('.theme-button').forEach(btn => btn.classList.remove('selected'));
+                    button.classList.add('selected');
+                });
+
+                const previewDiv = document.createElement('div');
+                previewDiv.className = 'theme-preview';
+                COLOR_THEMES[themeName].forEach(color => {
+                    const swatch = document.createElement('div');
+                    swatch.className = 'theme-swatch';
+                    swatch.style.backgroundColor = `#${color.toString(16).padStart(6, '0')}`;
+                    previewDiv.appendChild(swatch);
+                });
+                
+                optionDiv.appendChild(button);
+                optionDiv.appendChild(previewDiv);
+                container.appendChild(optionDiv);
+            });
+        }
+        function applyTheme() {
+            currentThemeColors = COLOR_THEMES[gameSettings.theme];
+        }
+
+        function startGame() {
+            mainMenu.style.display = 'none';
+            gameOverPanel.style.display = 'none';
+            pausePanel.style.display = 'none';
+            hud.style.display = 'flex';
+            missionDisplay.style.display = 'flex';
+            document.getElementById('pause-button').textContent = '||';
+
+            gameData.score = 0;
+            gameData.time = GAME_CONFIG.INITIAL_TIME;
+            gameData.combo = 1;
+            gameData.currentMission = [];
+            
+            tiles.forEach(tile => scene.remove(tile.mesh));
+            tiles.clear();
+            if (player) scene.remove(player.mesh);
+
+            createPlayer();
+            camera.position.set(0, 60, 60);
+            cameraTarget.set(0, 0, 0);
+            updateCamera();
+
+            for (let i = 0; i < 3; i++) {
+                addNewMission();
+            }
+            updateWorld();
+            ensureMissionTileExists();
+            
+            const startTile = tiles.get('0,0');
+            if (startTile && startTile.colorIndex === gameData.currentMission[0]) {
+                let newColorIndex;
+                do {
+                    newColorIndex = Math.floor(Math.random() * currentThemeColors.length);
+                } while (newColorIndex === gameData.currentMission[0]);
+                startTile.colorIndex = newColorIndex;
+                startTile.mesh.material.color.set(currentThemeColors[newColorIndex]);
+            }
+
+            gameState = 'PLAYING';
+        }
+
+        function gameOver() {
+            gameState = 'GAMEOVER';
+            hud.style.display = 'none';
+            missionDisplay.style.display = 'none';
+            gameOverPanel.style.display = 'flex';
+
+            finalScoreDisplay.textContent = gameData.score.toLocaleString();
+            if (gameData.score > gameData.highScore) {
+                gameData.highScore = gameData.score;
+                newHighScoreBadge.style.display = 'block';
+            } else {
+                newHighScoreBadge.style.display = 'none';
+            }
+            
+            const sparks = Math.floor(gameData.score / 100);
+            sparksEarnedDisplay.textContent = sparks.toLocaleString();
+            gameData.colorSparks += sparks;
+            
+            saveGameData();
+            highScoreDisplay.textContent = gameData.highScore.toLocaleString();
+        }
+
+        function update(deltaTime) {
+            if (gameState !== 'PLAYING' || !player) return;
+
+            gameData.time -= deltaTime;
+            if (gameData.time <= 0) {
+                gameData.time = 0;
+                gameOver();
+            }
+            
+            player.mesh.position.lerp(player.targetPosition, 0.2);
+            checkPlayerOnTile();
+            updateWorld();
+            updateUI();
+            updateTiles();
+        }
+
+        function updateUI() {
+            scoreDisplay.textContent = `Score: ${gameData.score.toLocaleString()}`;
+            const comboBonus = 1.0 + (gameData.combo - 1) * GAME_CONFIG.COMBO_MULTIPLIER;
+            comboDisplay.textContent = `Combo: x${Math.min(comboBonus, GAME_CONFIG.MAX_COMBO_BONUS).toFixed(1)}`;
+            timeDisplay.textContent = `Time: ${gameData.time.toFixed(1)}`;
+            timeBar.style.width = `${(gameData.time / GAME_CONFIG.INITIAL_TIME) * 100}%`;
+        }
+        
+        function createPlayer() {
+            const geometry = new THREE.SphereGeometry(GAME_CONFIG.TILE_SIZE * 0.4, 32, 16);
+            const material = new THREE.MeshStandardMaterial({ 
+                color: 0xffffff, emissive: 0xcccccc, metalness: 0.1, roughness: 0.2
+            });
+            const playerY = 0.5 + (GAME_CONFIG.TILE_SIZE * 0.4);
+            player = {
+                mesh: new THREE.Mesh(geometry, material),
+                gridX: 0, gridY: 0,
+                targetPosition: new THREE.Vector3(0, playerY, 0)
+            };
+            player.mesh.castShadow = true;
+            player.mesh.position.copy(player.targetPosition);
+            scene.add(player.mesh);
+        }
+
+        function handleInput(event) {
+            if (gameState !== 'PLAYING') return;
+            let dx = 0, dy = 0;
+            switch (event.key) {
+                case 'ArrowUp':    dy = 1; break;
+                case 'ArrowDown':  dy = -1; break;
+                case 'ArrowLeft':  dx = -1; break;
+                case 'ArrowRight': dx = 1; break;
+                default: return;
+            }
+            
+            const nextGridX = player.gridX + dx;
+            const nextGridY = player.gridY + dy;
+            const nextTileKey = `${nextGridX},${nextGridY}`;
+            const nextTile = tiles.get(nextTileKey);
+
+            if (nextTile && !nextTile.isDeactivated) {
+                player.gridX = nextGridX;
+                player.gridY = nextGridY;
+                const tileSpacing = GAME_CONFIG.TILE_SIZE + GAME_CONFIG.TILE_GAP;
+                player.targetPosition.x = player.gridX * tileSpacing;
+                player.targetPosition.z = player.gridY * tileSpacing * -1;
+            }
+        }
+        
+        function checkPlayerOnTile() {
+            const tileKey = `${player.gridX},${player.gridY}`;
+            const currentTile = tiles.get(tileKey);
+            if (currentTile && !currentTile.isDeactivated) {
+                handleStepOnTile(currentTile);
+            }
+        }
+
+        function handleStepOnTile(tile) {
+            tile.isDeactivated = true; 
+            const expectedColorIndex = gameData.currentMission[0];
+
+            if (tile.colorIndex === expectedColorIndex) {
+                const missionIcon = missionDisplay.firstChild;
+                if (missionIcon) {
+                    missionIcon.classList.add('mission-success-anim');
+                }
+
+                gameData.score += Math.round(GAME_CONFIG.BASE_SCORE_PER_TILE * (1.0 + (gameData.combo - 1) * GAME_CONFIG.COMBO_MULTIPLIER));
+                gameData.combo++;
+                gameData.time += GAME_CONFIG.TIME_REWARD_BASE;
+                
+                setTimeout(() => {
+                    gameData.currentMission.shift();
+                    addNewMission();
+                    ensureMissionTileExists();
+                    updateMissionUI();
+                }, 400);
+            } else {
+                gameData.combo = 1;
+                gameData.time -= GAME_CONFIG.TIME_PENALTY_PER_MOVE;
+                updateMissionUI();
+            }
+            
+            deactivateAndScheduleReactivation(tile);
+        }
+
+        function addNewMission() {
+            const newColorIndex = Math.floor(Math.random() * currentThemeColors.length);
+            gameData.currentMission.push(newColorIndex);
+        }
+
+        function ensureMissionTileExists() {
+            const nextMissionIndex = gameData.currentMission[0];
+            if (nextMissionIndex === undefined) return;
+
+            let missionTileExists = false;
+            for (const tile of tiles.values()) {
+                if (tile.colorIndex === nextMissionIndex && !tile.isDeactivated) {
+                    missionTileExists = true;
+                    break;
+                }
+            }
+
+            if (!missionTileExists) {
+                const candidateTiles = [];
+                for (const tile of tiles.values()) {
+                    if (tile.colorIndex !== nextMissionIndex && !tile.isDeactivated) {
+                        candidateTiles.push(tile);
+                    }
+                }
+
+                if (candidateTiles.length > 0) {
+                    const targetTile = candidateTiles[Math.floor(Math.random() * candidateTiles.length)];
+                    targetTile.colorIndex = nextMissionIndex;
+                    targetTile.mesh.material.color.set(currentThemeColors[nextMissionIndex]);
+                } else {
+                    const allTiles = Array.from(tiles.values()).filter(t => !t.isDeactivated && (t.gridX !== player.gridX || t.gridY !== player.gridY));
+                    if (allTiles.length > 0) {
+                        const targetTile = allTiles[Math.floor(Math.random() * allTiles.length)];
+                        targetTile.colorIndex = nextMissionIndex;
+                        targetTile.mesh.material.color.set(currentThemeColors[nextMissionIndex]);
+                    }
+                }
+            }
+        }
+
+        function updateWorld() {
+            if (!player) return;
+            const centerX = player.gridX;
+            const centerY = player.gridY;
+            const radius = GAME_CONFIG.GRID_RADIUS;
+
+            for (let x = centerX - radius; x <= centerX + radius; x++) {
+                for (let y = centerY - radius; y <= centerY + radius; y++) {
+                    const dist = Math.sqrt((x - centerX)**2 + (y - centerY)**2);
+                    if (dist <= radius) {
+                        const tileKey = `${x},${y}`;
+                        if (!tiles.has(tileKey)) {
+                            createTile(x, y, Math.floor(Math.random() * currentThemeColors.length));
+                        }
+                    }
+                }
+            }
+
+            for (const [key, tile] of tiles.entries()) {
+                const dist = Math.sqrt((tile.gridX - centerX)**2 + (tile.gridY - centerY)**2);
+                if (dist > radius + 3) {
+                    scene.remove(tile.mesh);
+                    tiles.delete(key);
+                }
+            }
+        }
+
+        function createTile(gridX, gridY, colorIndex) {
+            const tileKey = `${gridX},${gridY}`;
+            if (tiles.has(tileKey)) return;
+
+            const geometry = new THREE.BoxGeometry(GAME_CONFIG.TILE_SIZE, 1, GAME_CONFIG.TILE_SIZE);
+            const material = new THREE.MeshStandardMaterial({ color: currentThemeColors[colorIndex] });
+            const tileMesh = new THREE.Mesh(geometry, material);
+            
+            tileMesh.castShadow = true;
+
+            const tileSpacing = GAME_CONFIG.TILE_SIZE + GAME_CONFIG.TILE_GAP;
+            tileMesh.position.set(gridX * tileSpacing, 0, gridY * tileSpacing * -1);
+
+            scene.add(tileMesh);
+            const tileData = { 
+                mesh: tileMesh, gridX, gridY, colorIndex, 
+                isDeactivated: false, 
+                targetY: 0 
+            };
+            tiles.set(tileKey, tileData);
+            return tileData;
+        }
+
+        function deactivateAndScheduleReactivation(tile) {
+            tile.targetY = -GAME_CONFIG.TILE_SIZE;
+            tile.mesh.material.color.set(DEACTIVATED_COLOR);
+            tile.mesh.castShadow = false;
+
+            setTimeout(() => {
+                let newColorIndex;
+                do {
+                    newColorIndex = Math.floor(Math.random() * currentThemeColors.length);
+                } while (newColorIndex === gameData.currentMission[0]);
+                
+                tile.colorIndex = newColorIndex;
+                tile.mesh.material.color.set(currentThemeColors[newColorIndex]);
+                tile.isDeactivated = false;
+                tile.targetY = 0;
+                tile.mesh.castShadow = true;
+            }, GAME_CONFIG.TILE_RESPAWN_TIME);
+        }
+
+        function updateTiles() {
+            for (const tile of tiles.values()) {
+                if (tile.mesh.position.y !== tile.targetY) {
+                    tile.mesh.position.y = THREE.MathUtils.lerp(tile.mesh.position.y, tile.targetY, 0.1);
+                }
+            }
+        }
+
+        function updateMissionUI() {
+            missionDisplay.innerHTML = '';
+            const missionsToShow = gameData.currentMission.slice(0, 3);
+            missionsToShow.forEach((colorIndex, index) => {
+                const colorDiv = document.createElement('div');
+                colorDiv.className = 'mission-color';
+                colorDiv.style.backgroundColor = `#${currentThemeColors[colorIndex].toString(16).padStart(6, '0')}`;
+                if (index === 0) {
+                    colorDiv.classList.add('current');
+                }
+                missionDisplay.appendChild(colorDiv);
+            });
+        }
+        
+        function updateCamera() {
+            if (!player) return;
+            cameraTarget.lerp(player.mesh.position, 0.08);
+
+            const angle = -Math.PI / 18;
+            const distance = 80;
+
+            camera.position.x = cameraTarget.x + Math.sin(angle) * distance;
+            camera.position.z = cameraTarget.z + Math.cos(angle) * distance;
+            camera.position.y = cameraTarget.y + 60;
+            
+            camera.lookAt(cameraTarget);
+
+            directionalLight.position.x = cameraTarget.x + 30;
+            directionalLight.position.y = cameraTarget.y + 50;
+            directionalLight.position.z = cameraTarget.z + 20;
+            directionalLight.target.position.copy(cameraTarget);
+            directionalLight.target.updateMatrixWorld();
+        }
+
+        function togglePause() {
+            const pauseButton = document.getElementById('pause-button');
+            if (gameState === 'PLAYING') {
+                gameState = 'PAUSED';
+                pausePanel.style.display = 'flex';
+                pauseButton.textContent = '▶';
+            } else if (gameState === 'PAUSED') {
+                gameState = 'PLAYING';
+                pausePanel.style.display = 'none';
+                pauseButton.textContent = '||';
+            }
+        }
+
+        function goHome() {
+            gameState = 'MENU';
+            pausePanel.style.display = 'none';
+            hud.style.display = 'none';
+            missionDisplay.style.display = 'none';
+            mainMenu.style.display = 'flex';
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const deltaTime = clock.getDelta();
+            
+            if (gameState === 'PLAYING') {
+                update(deltaTime);
+                updateCamera();
+            }
+            
+            renderer.render(scene, camera);
+        }
+
+        init();
+    </script>
+</body>
+</html>
