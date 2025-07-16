@@ -297,6 +297,25 @@
         const DEACTIVATED_COLOR = 0x424242;
         let currentThemeColors = [];
 
+        // 이벤트 블록 시스템
+        const EVENT_BLOCK_TYPES = {
+            TIME_GAIN: 'time_gain',
+            TIME_LOSS: 'time_loss',
+            INVINCIBILITY: 'invincibility'
+        };
+
+        const EVENT_BLOCK_CONFIG = {
+            SPAWN_PROBABILITY: 0.05, // 5% 확률
+            TIME_GAIN_AMOUNT: 5,
+            TIME_LOSS_AMOUNT: 5,
+            INVINCIBILITY_DURATION: 5,
+            COLORS: {
+                TIME_GAIN: 0x00ff00,    // 초록색
+                TIME_LOSS: 0xff0000,    // 빨간색
+                INVINCIBILITY: 0xffff00  // 노란색
+            }
+        };
+
         const GAME_CONFIG = {
             INITIAL_TIME: 60, BASE_SCORE_PER_TILE: 100,
             COMBO_MULTIPLIER: 0.1, MAX_COMBO_BONUS: 3.0,
@@ -311,6 +330,8 @@
             score: 0, time: GAME_CONFIG.INITIAL_TIME, combo: 1,
             currentMission: [],
             highScore: 0, colorSparks: 0,
+            isInvincible: false,
+            invincibilityEndTime: 0
         };
         let gameSettings = {
             theme: '선명한 무지개',
@@ -319,6 +340,151 @@
         
         let player, clock = new THREE.Clock(), tiles = new Map(), directionalLight;
         let frameCounter = 0; // 성능 최적화용 프레임 카운터
+        
+        // 이벤트 블록 생성 확률 체크
+        function shouldCreateEventBlock() {
+            if (Math.random() < EVENT_BLOCK_CONFIG.SPAWN_PROBABILITY) {
+                const types = Object.values(EVENT_BLOCK_TYPES);
+                return types[Math.floor(Math.random() * types.length)];
+            }
+            return null;
+        }
+        
+        // 이벤트 블록에 심볼 추가
+        function addEventBlockSymbol(tileMesh, eventBlockType) {
+            const symbolGeometry = new THREE.PlaneGeometry(3, 3);
+            let symbolText = '';
+            
+            switch(eventBlockType) {
+                case EVENT_BLOCK_TYPES.TIME_GAIN:
+                    symbolText = '+T';
+                    break;
+                case EVENT_BLOCK_TYPES.TIME_LOSS:
+                    symbolText = '-T';
+                    break;
+                case EVENT_BLOCK_TYPES.INVINCIBILITY:
+                    symbolText = '★';
+                    break;
+            }
+            
+            // 텍스트 텍스처 생성
+            const canvas = document.createElement('canvas');
+            canvas.width = 128;
+            canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+            
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 60px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(symbolText, 64, 64);
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            const symbolMaterial = new THREE.MeshBasicMaterial({ 
+                map: texture, 
+                transparent: true,
+                alphaTest: 0.1
+            });
+            
+            const symbolMesh = new THREE.Mesh(symbolGeometry, symbolMaterial);
+            symbolMesh.position.set(0, 0.6, 0);
+            symbolMesh.rotation.x = -Math.PI / 2;
+            tileMesh.add(symbolMesh);
+        }
+        
+        // 이벤트 블록 효과 처리
+        function handleEventBlock(eventBlockType) {
+            switch(eventBlockType) {
+                case EVENT_BLOCK_TYPES.TIME_GAIN:
+                    gameData.time += EVENT_BLOCK_CONFIG.TIME_GAIN_AMOUNT;
+                    createParticleEffect('time_gain');
+                    break;
+                case EVENT_BLOCK_TYPES.TIME_LOSS:
+                    gameData.time -= EVENT_BLOCK_CONFIG.TIME_LOSS_AMOUNT;
+                    if (gameData.time < 0) gameData.time = 0;
+                    createParticleEffect('time_loss');
+                    break;
+                case EVENT_BLOCK_TYPES.INVINCIBILITY:
+                    gameData.isInvincible = true;
+                    gameData.invincibilityEndTime = Date.now() + (EVENT_BLOCK_CONFIG.INVINCIBILITY_DURATION * 1000);
+                    createParticleEffect('invincibility');
+                    activateInvincibilityEffect();
+                    break;
+            }
+        }
+        
+        // 무적 효과 시각화
+        function activateInvincibilityEffect() {
+            if (player) {
+                player.material.emissive.setHex(0xffff00);
+                player.material.emissiveIntensity = 0.5;
+            }
+        }
+        
+        // 무적 효과 해제
+        function deactivateInvincibilityEffect() {
+            if (player) {
+                player.material.emissive.setHex(0x000000);
+                player.material.emissiveIntensity = 0;
+            }
+        }
+        
+        // 파티클 효과 생성
+        function createParticleEffect(type) {
+            const particleGroup = new THREE.Group();
+            const particleCount = 20;
+            
+            for (let i = 0; i < particleCount; i++) {
+                const particleGeometry = new THREE.SphereGeometry(0.1, 8, 8);
+                let particleMaterial;
+                
+                switch(type) {
+                    case 'time_gain':
+                        particleMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00, transparent: true });
+                        break;
+                    case 'time_loss':
+                        particleMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true });
+                        break;
+                    case 'invincibility':
+                        particleMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00, transparent: true });
+                        break;
+                }
+                
+                const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+                particle.position.copy(player.position);
+                particle.velocity = new THREE.Vector3(
+                    (Math.random() - 0.5) * 10,
+                    Math.random() * 5,
+                    (Math.random() - 0.5) * 10
+                );
+                particle.life = 1.0;
+                particleGroup.add(particle);
+            }
+            
+            scene.add(particleGroup);
+            
+            // 파티클 애니메이션
+            const animateParticles = () => {
+                particleGroup.children.forEach(particle => {
+                    particle.position.add(particle.velocity.clone().multiplyScalar(0.02));
+                    particle.velocity.y -= 0.2; // 중력
+                    particle.life -= 0.02;
+                    particle.material.opacity = particle.life;
+                    
+                    if (particle.life <= 0) {
+                        particleGroup.remove(particle);
+                    }
+                });
+                
+                if (particleGroup.children.length > 0) {
+                    requestAnimationFrame(animateParticles);
+                } else {
+                    scene.remove(particleGroup);
+                }
+            };
+            
+            animateParticles();
+        }
 
         const hud = document.getElementById('hud');
         const mainMenu = document.getElementById('main-menu');
@@ -657,6 +823,12 @@
                 gameOver();
             }
             
+            // 무적 상태 확인
+            if (gameData.isInvincible && Date.now() > gameData.invincibilityEndTime) {
+                gameData.isInvincible = false;
+                deactivateInvincibilityEffect();
+            }
+            
             player.mesh.position.lerp(player.targetPosition, 0.2);
             checkPlayerOnTile();
             updateWorld();
@@ -723,6 +895,14 @@
 
         function handleStepOnTile(tile) {
             tile.isDeactivated = true; 
+            
+            // 이벤트 블록 처리
+            if (tile.eventBlockType) {
+                handleEventBlock(tile.eventBlockType);
+                deactivateAndScheduleReactivation(tile);
+                return;
+            }
+            
             const expectedColorIndex = gameData.currentMission[0];
 
             if (tile.colorIndex === expectedColorIndex) {
@@ -863,20 +1043,39 @@
             const tileKey = `${gridX},${gridY}`;
             if (tiles.has(tileKey)) return;
 
-            const geometry = new THREE.BoxGeometry(GAME_CONFIG.TILE_SIZE, 1, GAME_CONFIG.TILE_SIZE);
-            const material = new THREE.MeshStandardMaterial({ color: currentThemeColors[colorIndex] });
-            const tileMesh = new THREE.Mesh(geometry, material);
+            // 이벤트 블록 생성 확률 체크
+            const eventBlockType = shouldCreateEventBlock();
             
+            const geometry = new THREE.BoxGeometry(GAME_CONFIG.TILE_SIZE, 1, GAME_CONFIG.TILE_SIZE);
+            let material;
+            
+            if (eventBlockType) {
+                material = new THREE.MeshStandardMaterial({ 
+                    color: EVENT_BLOCK_CONFIG.COLORS[eventBlockType],
+                    emissive: EVENT_BLOCK_CONFIG.COLORS[eventBlockType],
+                    emissiveIntensity: 0.3
+                });
+            } else {
+                material = new THREE.MeshStandardMaterial({ color: currentThemeColors[colorIndex] });
+            }
+            
+            const tileMesh = new THREE.Mesh(geometry, material);
             tileMesh.castShadow = true;
 
             const tileSpacing = GAME_CONFIG.TILE_SIZE + GAME_CONFIG.TILE_GAP;
             tileMesh.position.set(gridX * tileSpacing, 0, gridY * tileSpacing * -1);
 
+            // 이벤트 블록에 심볼 추가
+            if (eventBlockType) {
+                addEventBlockSymbol(tileMesh, eventBlockType);
+            }
+
             scene.add(tileMesh);
             const tileData = { 
                 mesh: tileMesh, gridX, gridY, colorIndex, 
                 isDeactivated: false, 
-                targetY: 0 
+                targetY: 0,
+                eventBlockType: eventBlockType || null
             };
             tiles.set(tileKey, tileData);
             return tileData;
@@ -888,13 +1087,42 @@
             tile.mesh.castShadow = false;
 
             const reactivationTimeout = setTimeout(() => {
-                let newColorIndex;
-                do {
-                    newColorIndex = Math.floor(Math.random() * currentThemeColors.length);
-                } while (gameData.currentMission.includes(newColorIndex));
+                // 이벤트 블록인 경우 새로운 이벤트 블록 생성 체크
+                const eventBlockType = shouldCreateEventBlock();
                 
-                tile.colorIndex = newColorIndex;
-                tile.mesh.material.color.set(currentThemeColors[newColorIndex]);
+                if (eventBlockType) {
+                    tile.eventBlockType = eventBlockType;
+                    tile.mesh.material.color.set(EVENT_BLOCK_CONFIG.COLORS[eventBlockType]);
+                    tile.mesh.material.emissive.setHex(EVENT_BLOCK_CONFIG.COLORS[eventBlockType]);
+                    tile.mesh.material.emissiveIntensity = 0.3;
+                    
+                    // 기존 심볼 제거
+                    if (tile.mesh.children.length > 0) {
+                        tile.mesh.children.forEach(child => tile.mesh.remove(child));
+                    }
+                    
+                    // 새 심볼 추가
+                    addEventBlockSymbol(tile.mesh, eventBlockType);
+                } else {
+                    // 일반 블록으로 복원
+                    tile.eventBlockType = null;
+                    tile.mesh.material.emissive.setHex(0x000000);
+                    tile.mesh.material.emissiveIntensity = 0;
+                    
+                    // 기존 심볼 제거
+                    if (tile.mesh.children.length > 0) {
+                        tile.mesh.children.forEach(child => tile.mesh.remove(child));
+                    }
+                    
+                    let newColorIndex;
+                    do {
+                        newColorIndex = Math.floor(Math.random() * currentThemeColors.length);
+                    } while (gameData.currentMission.includes(newColorIndex));
+                    
+                    tile.colorIndex = newColorIndex;
+                    tile.mesh.material.color.set(currentThemeColors[newColorIndex]);
+                }
+                
                 tile.isDeactivated = false;
                 tile.targetY = 0;
                 tile.mesh.castShadow = true;
