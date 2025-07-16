@@ -365,7 +365,6 @@
             
             // 모바일 최적화: 화면 크기에 따라 줌 레벨 조정
             const zoom = isMobileDevice() ? 0.015 : 0.025; // 모바일에서는 더 작게
-            console.log('Zoom level:', zoom, 'isMobile:', isMobileDevice());
             
             camera.left = -width * zoom; camera.right = width * zoom;
             camera.top = height * zoom; camera.bottom = -height * zoom;
@@ -457,37 +456,19 @@
         }
 
         function updateVirtualKeyboard() {
-            console.log('updateVirtualKeyboard called:', {
-                isMobile: isMobileDevice(),
-                showVirtualKeyboard: gameSettings.showVirtualKeyboard,
-                gameState: gameState,
-                virtualKeyboard: virtualKeyboard
-            });
-            
-            // 임시로 항상 표시 (디버깅용)
-            if (gameSettings.showVirtualKeyboard && gameState === 'PLAYING') {
+            if (isMobileDevice() && gameSettings.showVirtualKeyboard && gameState === 'PLAYING') {
                 virtualKeyboard.classList.add('show');
-                virtualKeyboard.style.display = 'block'; // 강제로 표시
-                console.log('Virtual keyboard shown (forced)');
             } else {
                 virtualKeyboard.classList.remove('show');
-                virtualKeyboard.style.display = 'none';
-                console.log('Virtual keyboard hidden');
             }
         }
 
         function setupVirtualKeyboard() {
-            console.log('Setting up virtual keyboard...');
-            console.log('Virtual keyboard element:', virtualKeyboard);
-            console.log('Keyboard toggle element:', keyboardToggle);
-            
             // 가상 키보드 버튼 이벤트 설정
             const keyUp = document.getElementById('key-up');
             const keyDown = document.getElementById('key-down');
             const keyLeft = document.getElementById('key-left');
             const keyRight = document.getElementById('key-right');
-            
-            console.log('Key elements:', { keyUp, keyDown, keyLeft, keyRight });
             
             if (keyUp) keyUp.addEventListener('click', () => handleVirtualKey('ArrowUp'));
             if (keyDown) keyDown.addEventListener('click', () => handleVirtualKey('ArrowDown'));
@@ -505,7 +486,6 @@
         }
 
         function handleVirtualKey(key) {
-            console.log('Virtual key pressed:', key, 'gameState:', gameState);
             if (gameState !== 'PLAYING') return;
             
             // 버튼 누름 효과
