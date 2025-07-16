@@ -935,7 +935,8 @@
             const nextTileKey = `${nextGridX},${nextGridY}`;
             const nextTile = tiles.get(nextTileKey);
 
-            if (nextTile && !nextTile.isDeactivated) {
+            // 무적 상태일 때는 비활성화된 블록 위로도 이동 가능
+            if (nextTile && (!nextTile.isDeactivated || gameData.isInvincible)) {
                 player.gridX = nextGridX;
                 player.gridY = nextGridY;
                 const tileSpacing = GAME_CONFIG.TILE_SIZE + GAME_CONFIG.TILE_GAP;
@@ -947,8 +948,18 @@
         function checkPlayerOnTile() {
             const tileKey = `${player.gridX},${player.gridY}`;
             const currentTile = tiles.get(tileKey);
+            
             if (currentTile && !currentTile.isDeactivated) {
                 handleStepOnTile(currentTile);
+            } else if (currentTile && currentTile.isDeactivated && gameData.isInvincible) {
+                // 무적 상태에서 비활성화된 블록 위에 있을 때 시각적 피드백
+                const originalColor = currentTile.mesh.material.color.getHex();
+                currentTile.mesh.material.color.setHex(0xffff00); // 노란색으로 깜빡임
+                setTimeout(() => {
+                    if (currentTile.mesh && currentTile.mesh.material) {
+                        currentTile.mesh.material.color.setHex(originalColor);
+                    }
+                }, 200);
             }
         }
 
