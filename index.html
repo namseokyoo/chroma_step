@@ -162,25 +162,30 @@
         /* 모바일 HUD 최적화 */
         @media (max-width: 768px) {
             #hud {
-                padding: 10px;
+                padding: 5px;
             }
             .hud-group {
-                padding: 8px 12px;
+                padding: 5px 8px;
             }
             #score-display, #combo-display {
-                font-size: 1.1rem;
+                font-size: 0.9rem;
             }
             #time-display {
-                font-size: 1.1rem;
+                font-size: 0.9rem;
             }
             #mission-display {
-                top: 10px;
-                gap: 6px;
-                padding: 8px;
+                top: 5px;
+                gap: 4px;
+                padding: 5px;
             }
             .mission-color {
-                width: 24px;
-                height: 24px;
+                width: 20px;
+                height: 20px;
+            }
+            #pause-button {
+                width: 35px;
+                height: 35px;
+                font-size: 1.2rem;
             }
         }
     </style>
@@ -393,8 +398,7 @@
             renderer.setSize(width, height);
             
             // 모바일 최적화: 화면 크기에 따라 줌 레벨 조정
-            const zoom = isMobileDevice() ? 0.015 : 0.025; // 모바일에서는 더 작게
-            console.log('Zoom level:', zoom, 'isMobile:', isMobileDevice(), 'width:', window.innerWidth);
+            const zoom = isMobileDevice() ? 0.035 : 0.025; // 모바일에서는 더 넓게
             
             camera.left = -width * zoom; camera.right = width * zoom;
             camera.top = height * zoom; camera.bottom = -height * zoom;
@@ -482,22 +486,10 @@
         }
 
         function updateVirtualKeyboard() {
-            console.log('updateVirtualKeyboard called:', {
-                isMobile: isMobileDevice(),
-                showVirtualKeyboard: gameSettings.showVirtualKeyboard,
-                gameState: gameState,
-                virtualKeyboard: virtualKeyboard
-            });
-            
-            // 임시 디버깅: 항상 키보드 표시
-            if (gameState === 'PLAYING') {
+            if (isMobileDevice() && gameSettings.showVirtualKeyboard && gameState === 'PLAYING') {
                 virtualKeyboard.classList.add('show');
-                virtualKeyboard.style.display = 'block';
-                console.log('Virtual keyboard forced to show');
             } else {
                 virtualKeyboard.classList.remove('show');
-                virtualKeyboard.style.display = 'none';
-                console.log('Virtual keyboard hidden');
             }
         }
 
