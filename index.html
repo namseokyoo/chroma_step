@@ -432,6 +432,11 @@
                 gameSettings.showVirtualKeyboard = true;
             }
             
+            // 임시: 가상 키보드 강제 활성화 (테스트용)
+            console.log('원래 설정:', gameSettings.showVirtualKeyboard);
+            gameSettings.showVirtualKeyboard = true;
+            console.log('강제 설정 후:', gameSettings.showVirtualKeyboard);
+            
             console.log('최종 설정:', gameSettings);
         }
 
@@ -488,6 +493,7 @@
             });
             
             // 가상 키보드 체크박스 상태 설정
+            console.log('체크박스 설정:', gameSettings.showVirtualKeyboard);
             keyboardToggle.checked = gameSettings.showVirtualKeyboard;
         }
         function applyTheme() {
@@ -514,22 +520,20 @@
             console.log('showKeyboard:', showKeyboard);
             console.log('isPlaying:', isPlaying);
             console.log('virtualKeyboard element:', virtualKeyboard);
-            console.log('현재 classList:', virtualKeyboard.classList);
-            console.log('현재 style.display:', virtualKeyboard.style.display);
             
-            // 임시 테스트: 항상 키보드 표시 (플레이 중일 때)
-            if (isPlaying) {
+            // CSS 우선순위 문제 해결: 인라인 스타일 제거
+            virtualKeyboard.style.display = '';
+            
+            if (isMobile && showKeyboard && isPlaying) {
                 virtualKeyboard.classList.add('show');
-                virtualKeyboard.style.display = 'block';
-                console.log('🔧 임시 테스트: 키보드 강제 표시');
+                console.log('✅ 키보드 표시 조건 만족 - 표시함');
             } else {
                 virtualKeyboard.classList.remove('show');
-                virtualKeyboard.style.display = 'none';
-                console.log('❌ 게임 중이 아님 - 키보드 숨김');
+                console.log('❌ 키보드 표시 조건 불만족 - 숨김');
+                console.log('조건 체크: isMobile &&', isMobile, '&& showKeyboard &&', showKeyboard, '&& isPlaying &&', isPlaying);
             }
             
-            // 원래 조건 로그
-            console.log('원래 조건 체크: isMobile &&', isMobile, '&& showKeyboard &&', showKeyboard, '&& isPlaying &&', isPlaying);
+            console.log('최종 classList:', virtualKeyboard.classList);
         }
 
         function setupVirtualKeyboard() {
@@ -547,10 +551,13 @@
             // 체크박스 이벤트 설정
             if (keyboardToggle) {
                 keyboardToggle.addEventListener('change', (e) => {
+                    console.log('체크박스 변경:', e.target.checked);
                     gameSettings.showVirtualKeyboard = e.target.checked;
                     updateVirtualKeyboard();
                     saveGameData();
                 });
+            } else {
+                console.log('⚠️ 체크박스 엘리먼트가 없습니다!');
             }
         }
 
