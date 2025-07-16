@@ -158,6 +158,31 @@
         .setting-label input[type="checkbox"] {
             width: 20px; height: 20px; cursor: pointer;
         }
+
+        /* 모바일 HUD 최적화 */
+        @media (max-width: 768px) {
+            #hud {
+                padding: 10px;
+            }
+            .hud-group {
+                padding: 8px 12px;
+            }
+            #score-display, #combo-display {
+                font-size: 1.1rem;
+            }
+            #time-display {
+                font-size: 1.1rem;
+            }
+            #mission-display {
+                top: 10px;
+                gap: 6px;
+                padding: 8px;
+            }
+            .mission-color {
+                width: 24px;
+                height: 24px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -357,6 +382,10 @@
             animate();
         }
 
+        function isMobileDevice() {
+            return window.innerWidth <= 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        }
+
         function onWindowResize() {
             const container = document.getElementById('canvas-container');
             const width = container.clientWidth;
@@ -365,6 +394,7 @@
             
             // 모바일 최적화: 화면 크기에 따라 줌 레벨 조정
             const zoom = isMobileDevice() ? 0.015 : 0.025; // 모바일에서는 더 작게
+            console.log('Zoom level:', zoom, 'isMobile:', isMobileDevice(), 'width:', window.innerWidth);
             
             camera.left = -width * zoom; camera.right = width * zoom;
             camera.top = height * zoom; camera.bottom = -height * zoom;
@@ -451,15 +481,23 @@
             }
         }
 
-        function isMobileDevice() {
-            return window.innerWidth <= 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        }
-
         function updateVirtualKeyboard() {
-            if (isMobileDevice() && gameSettings.showVirtualKeyboard && gameState === 'PLAYING') {
+            console.log('updateVirtualKeyboard called:', {
+                isMobile: isMobileDevice(),
+                showVirtualKeyboard: gameSettings.showVirtualKeyboard,
+                gameState: gameState,
+                virtualKeyboard: virtualKeyboard
+            });
+            
+            // 임시 디버깅: 항상 키보드 표시
+            if (gameState === 'PLAYING') {
                 virtualKeyboard.classList.add('show');
+                virtualKeyboard.style.display = 'block';
+                console.log('Virtual keyboard forced to show');
             } else {
                 virtualKeyboard.classList.remove('show');
+                virtualKeyboard.style.display = 'none';
+                console.log('Virtual keyboard hidden');
             }
         }
 
