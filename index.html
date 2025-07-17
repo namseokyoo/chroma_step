@@ -216,6 +216,7 @@
                 <p style="font-size: 1rem; margin-bottom: 30px;">High Score: <span id="high-score">0</span></p>
                 <div style="display: flex; flex-direction: column; gap: 15px; align-items: center;">
                     <button id="start-button" class="ui-button">게임 시작</button>
+                    <button id="tutorial-button" class="ui-button">튜토리얼</button>
                     <button id="settings-button" class="ui-button">설정</button>
                 </div>
             </div>
@@ -249,6 +250,26 @@
                 <h1>일시정지</h1>
                 <button id="resume-button" class="ui-button">계속하기</button>
                 <button id="home-button" class="ui-button">홈으로</button>
+            </div>
+            
+            <!-- 튜토리얼 오버레이 -->
+            <div id="tutorial-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.7); z-index: 2000;">
+                <div id="tutorial-content" style="position: absolute; bottom: 20px; right: 20px; max-width: 400px; background: rgba(255, 255, 255, 0.95); padding: 20px; border-radius: 10px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);">
+                    <div id="tutorial-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3 id="tutorial-title" style="margin: 0; font-size: 1.2rem; color: #333;">튜토리얼</h3>
+                        <span id="tutorial-progress" style="font-size: 0.9rem; color: #666;">1/7</span>
+                    </div>
+                    <div id="tutorial-description" style="margin-bottom: 20px; font-size: 1rem; color: #333; line-height: 1.4;">
+                        게임을 시작하겠습니다!
+                    </div>
+                    <div id="tutorial-controls" style="display: flex; justify-content: space-between; gap: 10px;">
+                        <button id="tutorial-skip" class="ui-button" style="background: #666; font-size: 0.9rem; padding: 8px 16px;">건너뛰기</button>
+                        <div style="display: flex; gap: 10px;">
+                            <button id="tutorial-prev" class="ui-button" style="font-size: 0.9rem; padding: 8px 16px;" disabled>이전</button>
+                            <button id="tutorial-next" class="ui-button" style="font-size: 0.9rem; padding: 8px 16px;">다음</button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
         
@@ -338,6 +359,77 @@
         let gameSettings = {
             theme: '선명한 무지개',
             showVirtualKeyboard: true
+        };
+        
+        // 튜토리얼 시스템
+        const tutorialSteps = [
+            {
+                id: 0,
+                title: "게임 소개",
+                description: "CHROMA STEP에 오신 걸 환영합니다! 색깔 블록을 밟아 미션을 완료하는 리듬 게임입니다.",
+                highlight: null,
+                playerCanMove: false,
+                autoNext: false
+            },
+            {
+                id: 1,
+                title: "이동 방법",
+                description: "방향키 또는 WASD로 이동할 수 있습니다. 한 번 이동해보세요!",
+                highlight: "player",
+                playerCanMove: true,
+                autoNext: true,
+                waitForMove: true
+            },
+            {
+                id: 2,
+                title: "미션 시스템",
+                description: "화면 상단에 표시된 색깔이 현재 미션입니다. 이 색깔과 일치하는 블록을 찾아 밟으세요!",
+                highlight: "mission",
+                playerCanMove: true,
+                autoNext: false,
+                forcedMissionColor: 0
+            },
+            {
+                id: 3,
+                title: "올바른 블록 밟기",
+                description: "미션 색깔과 일치하는 블록을 밟으면 점수를 얻습니다. 한 번 밟아보세요!",
+                highlight: "tile",
+                playerCanMove: true,
+                autoNext: true,
+                waitForCorrectTile: true
+            },
+            {
+                id: 4,
+                title: "콤보 시스템",
+                description: "연속으로 성공하면 콤보가 증가하여 더 많은 점수를 얻을 수 있습니다!",
+                highlight: "combo",
+                playerCanMove: true,
+                autoNext: false
+            },
+            {
+                id: 5,
+                title: "특수 블록",
+                description: "가끔 특수 블록이 나타납니다. 초록색(+T)은 시간 증가, 빨간색(-T)은 시간 감소, 노란색(★)은 무적 상태입니다.",
+                highlight: null,
+                playerCanMove: true,
+                autoNext: false
+            },
+            {
+                id: 6,
+                title: "시간 관리",
+                description: "시간이 다 떨어지면 게임 오버! 올바른 블록을 밟으면 시간이 회복됩니다. 이제 실제 게임을 시작해보세요!",
+                highlight: "time",
+                playerCanMove: true,
+                autoNext: false,
+                isLastStep: true
+            }
+        ];
+        
+        let tutorialData = {
+            isActive: false,
+            currentStep: 0,
+            hasPlayerMoved: false,
+            hasSteppedCorrectTile: false
         };
         
         let player, clock = new THREE.Clock(), tiles = new Map(), directionalLight;
@@ -560,6 +652,13 @@
         const keyboardToggle = document.getElementById('virtual-keyboard-toggle');
         const invincibilityTimer = document.getElementById('invincibility-timer');
         const invincibilityCountdown = document.getElementById('invincibility-countdown');
+        const tutorialOverlay = document.getElementById('tutorial-overlay');
+        const tutorialTitle = document.getElementById('tutorial-title');
+        const tutorialDescription = document.getElementById('tutorial-description');
+        const tutorialProgress = document.getElementById('tutorial-progress');
+        const tutorialPrevBtn = document.getElementById('tutorial-prev');
+        const tutorialNextBtn = document.getElementById('tutorial-next');
+        const tutorialSkipBtn = document.getElementById('tutorial-skip');
 
         function init() {
             scene.background = new THREE.Color(0x121212);
@@ -594,12 +693,19 @@
             applyTheme();
 
             document.getElementById('start-button').addEventListener('click', startGame);
+            document.getElementById('tutorial-button').addEventListener('click', startTutorial);
             document.getElementById('settings-button').addEventListener('click', showSettingsPanel);
             document.getElementById('back-to-menu-button').addEventListener('click', showMainMenu);
             document.getElementById('restart-button').addEventListener('click', startGame);
             document.getElementById('pause-button').addEventListener('click', togglePause);
             document.getElementById('resume-button').addEventListener('click', togglePause);
             document.getElementById('home-button').addEventListener('click', goHome);
+            
+            // 튜토리얼 버튼 이벤트
+            tutorialPrevBtn.addEventListener('click', previousTutorialStep);
+            tutorialNextBtn.addEventListener('click', nextTutorialStep);
+            tutorialSkipBtn.addEventListener('click', exitTutorial);
+            
             window.addEventListener('keydown', handleInput);
             window.addEventListener('resize', () => {
                 onWindowResize();
@@ -919,7 +1025,14 @@
         }
 
         function handleInput(event) {
-            if (gameState !== 'PLAYING') return;
+            if (gameState !== 'PLAYING' && gameState !== 'TUTORIAL') return;
+            
+            // 튜토리얼 상태에서는 플레이어 이동 허용 여부 확인
+            if (gameState === 'TUTORIAL') {
+                const currentStep = tutorialSteps[tutorialData.currentStep];
+                if (!currentStep.playerCanMove) return;
+            }
+            
             let dx = 0, dy = 0;
             switch (event.key) {
                 case 'ArrowUp':    dy = 1; break;
@@ -941,6 +1054,15 @@
                 const tileSpacing = GAME_CONFIG.TILE_SIZE + GAME_CONFIG.TILE_GAP;
                 player.targetPosition.x = player.gridX * tileSpacing;
                 player.targetPosition.z = player.gridY * tileSpacing * -1;
+                
+                // 튜토리얼 상태에서 이동 완료 표시
+                if (gameState === 'TUTORIAL') {
+                    tutorialData.hasPlayerMoved = true;
+                    const currentStep = tutorialSteps[tutorialData.currentStep];
+                    if (currentStep.autoNext && currentStep.waitForMove) {
+                        updateTutorialUI();
+                    }
+                }
             }
         }
         
@@ -980,7 +1102,20 @@
 
                 gameData.score += Math.round(GAME_CONFIG.BASE_SCORE_PER_TILE * (1.0 + (gameData.combo - 1) * GAME_CONFIG.COMBO_MULTIPLIER));
                 gameData.combo++;
-                gameData.time += GAME_CONFIG.TIME_REWARD_BASE;
+                
+                // 튜토리얼 상태가 아닐 때만 시간 업데이트
+                if (gameState !== 'TUTORIAL') {
+                    gameData.time += GAME_CONFIG.TIME_REWARD_BASE;
+                }
+                
+                // 튜토리얼 상태에서 올바른 타일 밟기 완료 표시
+                if (gameState === 'TUTORIAL') {
+                    tutorialData.hasSteppedCorrectTile = true;
+                    const currentStep = tutorialSteps[tutorialData.currentStep];
+                    if (currentStep.autoNext && currentStep.waitForCorrectTile) {
+                        updateTutorialUI();
+                    }
+                }
                 
                 // 레이스 컨디션 수정: 즉시 미션 업데이트
                 gameData.currentMission.shift();
@@ -989,7 +1124,10 @@
                 updateMissionUI();
             } else {
                 gameData.combo = 1;
-                gameData.time -= GAME_CONFIG.TIME_PENALTY_PER_MOVE;
+                // 튜토리얼 상태가 아닐 때만 시간 페널티
+                if (gameState !== 'TUTORIAL') {
+                    gameData.time -= GAME_CONFIG.TIME_PENALTY_PER_MOVE;
+                }
                 updateMissionUI();
             }
             
@@ -1250,6 +1388,131 @@
             updateVirtualKeyboard();
         }
 
+        // 튜토리얼 시스템 함수들
+        function startTutorial() {
+            console.log('튜토리얼 시작');
+            gameState = 'TUTORIAL';
+            tutorialData.isActive = true;
+            tutorialData.currentStep = 0;
+            tutorialData.hasPlayerMoved = false;
+            tutorialData.hasSteppedCorrectTile = false;
+            
+            // UI 설정
+            mainMenu.style.display = 'none';
+            hud.style.display = 'flex';
+            missionDisplay.style.display = 'flex';
+            tutorialOverlay.style.display = 'block';
+            
+            // 게임 초기화 (시간 정지 상태)
+            initializeGame();
+            gameData.time = GAME_CONFIG.INITIAL_TIME;
+            
+            // 첫 번째 단계 표시
+            updateTutorialUI();
+            
+            updateVirtualKeyboard();
+        }
+        
+        function updateTutorialUI() {
+            const step = tutorialSteps[tutorialData.currentStep];
+            tutorialTitle.textContent = step.title;
+            tutorialDescription.textContent = step.description;
+            tutorialProgress.textContent = `${tutorialData.currentStep + 1}/${tutorialSteps.length}`;
+            
+            // 버튼 상태 업데이트
+            tutorialPrevBtn.disabled = tutorialData.currentStep === 0;
+            tutorialNextBtn.disabled = step.autoNext && !checkStepCompletion(step);
+            
+            if (step.isLastStep) {
+                tutorialNextBtn.textContent = '완료';
+            } else {
+                tutorialNextBtn.textContent = '다음';
+            }
+        }
+        
+        function checkStepCompletion(step) {
+            if (step.waitForMove) {
+                return tutorialData.hasPlayerMoved;
+            }
+            if (step.waitForCorrectTile) {
+                return tutorialData.hasSteppedCorrectTile;
+            }
+            return true;
+        }
+        
+        function nextTutorialStep() {
+            const currentStep = tutorialSteps[tutorialData.currentStep];
+            
+            if (currentStep.isLastStep) {
+                exitTutorial();
+                return;
+            }
+            
+            if (tutorialData.currentStep < tutorialSteps.length - 1) {
+                tutorialData.currentStep++;
+                
+                // 단계별 초기화
+                const nextStep = tutorialSteps[tutorialData.currentStep];
+                if (nextStep.waitForMove) {
+                    tutorialData.hasPlayerMoved = false;
+                }
+                if (nextStep.waitForCorrectTile) {
+                    tutorialData.hasSteppedCorrectTile = false;
+                }
+                
+                // 강제 미션 설정
+                if (nextStep.forcedMissionColor !== undefined) {
+                    gameData.currentMission = [nextStep.forcedMissionColor];
+                    updateMissionUI();
+                }
+                
+                updateTutorialUI();
+            }
+        }
+        
+        function previousTutorialStep() {
+            if (tutorialData.currentStep > 0) {
+                tutorialData.currentStep--;
+                updateTutorialUI();
+            }
+        }
+        
+        function exitTutorial() {
+            console.log('튜토리얼 종료');
+            tutorialData.isActive = false;
+            tutorialOverlay.style.display = 'none';
+            goHome();
+        }
+        
+        function initializeGame() {
+            // 기존 타일 정리
+            tiles.forEach(tile => {
+                if (tile.reactivationTimeout) {
+                    clearTimeout(tile.reactivationTimeout);
+                }
+                scene.remove(tile.mesh);
+            });
+            tiles.clear();
+            
+            // 플레이어 생성
+            if (player) {
+                scene.remove(player.mesh);
+            }
+            createPlayer();
+            
+            // 기본 타일 생성
+            for (let dx = -2; dx <= 2; dx++) {
+                for (let dy = -2; dy <= 2; dy++) {
+                    const colorIndex = Math.floor(Math.random() * currentThemeColors.length);
+                    createTile(dx, dy, colorIndex);
+                }
+            }
+            
+            // 첫 미션 생성
+            addNewMission();
+            updateMissionUI();
+        }
+
         function animate() {
             requestAnimationFrame(animate);
             const deltaTime = clock.getDelta();
@@ -1257,6 +1520,14 @@
             if (gameState === 'PLAYING') {
                 update(deltaTime);
                 updateCamera();
+            } else if (gameState === 'TUTORIAL') {
+                // 튜토리얼 상태에서는 시간 흐름 정지, 플레이어 이동만 처리
+                if (player) {
+                    player.mesh.position.lerp(player.targetPosition, 0.2);
+                    checkPlayerOnTile();
+                    updateTiles();
+                    updateCamera();
+                }
             }
             
             renderer.render(scene, camera);
