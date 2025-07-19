@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>크로마 스텝 (Chroma Step) - MVP v2.6</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap');
@@ -17,6 +17,11 @@
             background-color: var(--color-bg); color: var(--color-text);
             display: flex; justify-content: center; align-items: center;
             width: 100vw; height: 100vh; overflow: hidden;
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+            -webkit-tap-highlight-color: transparent;
         }
 
         #game-container {
@@ -31,7 +36,12 @@
             position: relative;
         }
 
-        canvas { display: block; width: 100%; height: 100%; border-radius: 16px; }
+        canvas { 
+            display: block; width: 100%; height: 100%; border-radius: 16px;
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-user-select: none;
+        }
         
         .ui-panel {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
@@ -42,6 +52,7 @@
         }
 
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
 
         .ui-panel h1 { font-size: 3rem; margin-bottom: 10px; letter-spacing: 2px; text-shadow: 0 0 10px var(--color-cyan); }
         .ui-panel p { font-size: 1.2rem; margin-bottom: 30px; }
@@ -52,12 +63,48 @@
             border: none; border-radius: 50px; cursor: pointer;
             transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(24, 255, 255, 0.3);
             margin: 5px;
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent;
         }
         .ui-button:hover { transform: translateY(-3px); box-shadow: 0 8px 25px rgba(24, 255, 255, 0.5); }
         
         #game-over-panel .stats { margin: 20px 0; font-size: 1.5rem; }
         #game-over-panel .new-highscore { color: var(--color-yellow); animation: pulse 1s infinite; }
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+        
+        /* 콤보 애니메이션 */
+        @keyframes comboBoost {
+            0% { transform: scale(1); color: inherit; }
+            50% { transform: scale(1.2); color: var(--color-yellow); text-shadow: 0 0 10px var(--color-yellow); }
+            100% { transform: scale(1); color: inherit; text-shadow: none; }
+        }
+        
+        @keyframes screenFlash {
+            0% { background-color: transparent; }
+            50% { background-color: rgba(255, 255, 255, 0.1); }
+            100% { background-color: transparent; }
+        }
+        
+        .combo-boost {
+            animation: comboBoost 0.5s ease-out;
+        }
+        
+        .screen-flash {
+            animation: screenFlash 0.3s ease-out;
+        }
+        
+        /* 성공 타일 효과 */
+        @keyframes tileSuccess {
+            0% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-10px) scale(1.1); }
+            100% { transform: translateY(0) scale(1); }
+        }
+        
+        .tile-success {
+            animation: tileSuccess 0.4s ease-out;
+        }
 
         #hud {
             width: 100%; padding: 20px; box-sizing: border-box; position: absolute;
@@ -75,10 +122,11 @@
             top: 20px; left: 50%; transform: translateX(-50%); pointer-events: none;
         }
         .mission-color {
-            width: 30px; height: 30px; border-radius: 50%; border: 3px solid var(--color-text);
+            width: 40px; height: 40px; border-radius: 50%; border: 3px solid var(--color-text);
             transition: all 0.3s ease;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
         }
-        .mission-color.current { transform: scale(1.2); box-shadow: 0 0 15px #fff; }
+        .mission-color.current { transform: scale(1.3); box-shadow: 0 0 20px #fff, 0 0 30px rgba(255, 255, 255, 0.5); }
         .mission-success-anim { animation: missionSuccess 0.5s ease-in-out; }
         @keyframes missionSuccess {
             0% { transform: scale(1.2); box-shadow: 0 0 15px #fff; }
@@ -134,6 +182,10 @@
             border: 2px solid var(--color-cyan); font-size: 20px; font-weight: bold;
             cursor: pointer; transition: all 0.2s ease;
             backdrop-filter: blur(10px); box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent;
         }
         .keyboard-key:hover, .keyboard-key:active {
             background-color: var(--color-cyan); color: var(--color-bg);
@@ -175,12 +227,13 @@
             }
             #mission-display {
                 top: 5px;
-                gap: 4px;
-                padding: 5px;
+                gap: 6px;
+                padding: 8px;
             }
             .mission-color {
-                width: 20px;
-                height: 20px;
+                width: 35px;
+                height: 35px;
+                border-width: 2px;
             }
             #pause-button {
                 width: 35px;
@@ -212,8 +265,15 @@
             </div>
             <div id="mission-display" style="display: none;"></div>
             <div id="main-menu" class="ui-panel">
-                <h1 style="font-size: 3.5rem; margin-bottom: 30px;">CHROMA STEP</h1>
-                <p style="font-size: 1rem; margin-bottom: 30px;">High Score: <span id="high-score">0</span></p>
+                <h1 style="font-size: 3.5rem; margin-bottom: 20px;">CHROMA STEP</h1>
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <p style="font-size: 1.2rem; margin: 5px 0;">레벨 <span id="player-level">1</span></p>
+                    <div style="width: 200px; height: 8px; background-color: rgba(255,255,255,0.2); border-radius: 4px; margin: 8px auto;">
+                        <div id="exp-bar" style="width: 0%; height: 100%; background-color: var(--color-cyan); border-radius: 4px; transition: width 0.3s ease;"></div>
+                    </div>
+                    <p style="font-size: 0.9rem; margin: 5px 0; opacity: 0.8;"><span id="exp-display">0</span> / <span id="exp-needed">500</span> EXP</p>
+                    <p style="font-size: 1rem; margin: 10px 0;">최고 점수: <span id="high-score">0</span></p>
+                </div>
                 <div style="display: flex; flex-direction: column; gap: 15px; align-items: center;">
                     <button id="start-button" class="ui-button">게임 시작</button>
                     <button id="tutorial-button" class="ui-button">튜토리얼</button>
@@ -340,21 +400,59 @@
         };
 
         const GAME_CONFIG = {
-            INITIAL_TIME: 60, BASE_SCORE_PER_TILE: 100,
-            COMBO_MULTIPLIER: 0.1, MAX_COMBO_BONUS: 3.0,
-            TIME_REWARD_BASE: 2,
+            INITIAL_TIME: 45, BASE_SCORE_PER_TILE: 100,
+            COMBO_MULTIPLIER: 0.15, MAX_COMBO_BONUS: 4.0,
+            TIME_REWARD_BASE: 1.5,
             TILE_SIZE: 5, TILE_GAP: 1, GRID_RADIUS: 15, 
-            TILE_RESPAWN_TIME: 5000,
-            TIME_PENALTY_PER_MOVE: 0.5,
+            TILE_RESPAWN_TIME: 4000,
+            TIME_PENALTY_PER_MOVE: 1.0,
+            TIME_DECAY_RATE: 1.2, // 시간당 추가 감소율
         };
         
         let gameState = 'MENU';
+        // 보상 시스템 설정
+        const REWARD_SYSTEM = {
+            levels: [0, 500, 1200, 2000, 3500, 5500, 8000, 12000, 17000, 25000], // 레벨업 필요 점수
+            skins: [
+                { id: 'basic', name: '기본', color: 0xffffff, unlockLevel: 0 },
+                { id: 'neon', name: '네온', color: 0x00ffff, unlockLevel: 2 },
+                { id: 'gold', name: '황금', color: 0xffd700, unlockLevel: 4 },
+                { id: 'rainbow', name: '무지개', color: 0xff69b4, unlockLevel: 6 },
+                { id: 'crystal', name: '크리스탈', color: 0x9370db, unlockLevel: 8 }
+            ]
+        };
+
+        // 도전과제 시스템
+        const ACHIEVEMENTS = {
+            first_steps: { name: '첫 걸음', desc: '첫 번째 타일 밟기', target: 1, reward: 50 },
+            combo_starter: { name: '콤보 시작', desc: '5콤보 달성', target: 5, reward: 100 },
+            combo_master: { name: '콤보 마스터', desc: '15콤보 달성', target: 15, reward: 200 },
+            combo_legend: { name: '콤보 전설', desc: '25콤보 달성', target: 25, reward: 500 },
+            score_hunter: { name: '점수 사냥꾼', desc: '1000점 달성', target: 1000, reward: 100 },
+            score_champion: { name: '점수 챔피언', desc: '5000점 달성', target: 5000, reward: 300 },
+            time_survivor: { name: '시간 생존자', desc: '2분 생존', target: 120, reward: 200 },
+            special_collector: { name: '특수 수집가', desc: '특수 블록 10개 밟기', target: 10, reward: 150 }
+        };
+
         let gameData = {
             score: 0, time: GAME_CONFIG.INITIAL_TIME, combo: 1,
             currentMission: [],
             highScore: 0, colorSparks: 0,
             isInvincible: false,
-            invincibilityEndTime: 0
+            invincibilityEndTime: 0,
+            // 진행 시스템
+            totalScore: 0, // 누적 점수
+            level: 1,
+            experience: 0,
+            currentSkin: 'basic',
+            // 도전과제 시스템
+            achievements: {},
+            sessionStats: {
+                tilesPressed: 0,
+                maxCombo: 0,
+                specialBlocksCollected: 0,
+                survivalTime: 0
+            }
         };
         let gameSettings = {
             theme: '선명한 무지개',
@@ -560,11 +658,11 @@
         }
         
         // 파티클 효과 생성
-        function createParticleEffect(type) {
+        function createParticleEffect(type, position) {
             if (!player) return; // 플레이어가 없으면 파티클 생성 안함
             
             const particleGroup = new THREE.Group();
-            const particleCount = 30; // 파티클 개수 증가
+            const particleCount = type === 'success' ? 20 : 30; // 성공 효과는 적은 파티클
             
             for (let i = 0; i < particleCount; i++) {
                 const particleGeometry = new THREE.SphereGeometry(0.3, 8, 8); // 크기 증가
@@ -595,17 +693,39 @@
                             emissiveIntensity: 0.5
                         });
                         break;
+                    case 'success':
+                        particleMaterial = new THREE.MeshBasicMaterial({ 
+                            color: 0xffffff, 
+                            transparent: true,
+                            emissive: 0xffffff,
+                            emissiveIntensity: 0.8
+                        });
+                        break;
                 }
                 
                 const particle = new THREE.Mesh(particleGeometry, particleMaterial);
-                particle.position.copy(player.mesh.position); // player.mesh.position 사용
-                particle.position.y += 2; // 플레이어 위쪽에서 시작
-                particle.velocity = new THREE.Vector3(
-                    (Math.random() - 0.5) * 15,
-                    Math.random() * 8 + 2,
-                    (Math.random() - 0.5) * 15
-                );
-                particle.life = 2.0; // 수명 증가
+                
+                // 위치 설정 (position이 제공되면 사용, 아니면 플레이어 위치)
+                const basePos = position || player.mesh.position;
+                particle.position.copy(basePos);
+                particle.position.y += 2; // 위쪽에서 시작
+                
+                if (type === 'success') {
+                    // 성공 효과는 더 화려하게
+                    particle.velocity = new THREE.Vector3(
+                        (Math.random() - 0.5) * 10,
+                        Math.random() * 12 + 3,
+                        (Math.random() - 0.5) * 10
+                    );
+                } else {
+                    particle.velocity = new THREE.Vector3(
+                        (Math.random() - 0.5) * 15,
+                        Math.random() * 8 + 2,
+                        (Math.random() - 0.5) * 15
+                    );
+                }
+                
+                particle.life = type === 'success' ? 1.5 : 2.0;
                 particleGroup.add(particle);
             }
             
@@ -617,7 +737,7 @@
                     particle.position.add(particle.velocity.clone().multiplyScalar(0.03));
                     particle.velocity.y -= 0.3; // 중력 증가
                     particle.life -= 0.03;
-                    particle.material.opacity = particle.life / 2.0;
+                    particle.material.opacity = particle.life / (type === 'success' ? 1.5 : 2.0);
                     
                     if (particle.life <= 0) {
                         particleGroup.remove(particle);
@@ -659,6 +779,10 @@
         const tutorialPrevBtn = document.getElementById('tutorial-prev');
         const tutorialNextBtn = document.getElementById('tutorial-next');
         const tutorialSkipBtn = document.getElementById('tutorial-skip');
+        const playerLevelDisplay = document.getElementById('player-level');
+        const expBar = document.getElementById('exp-bar');
+        const expDisplay = document.getElementById('exp-display');
+        const expNeededDisplay = document.getElementById('exp-needed');
 
         function init() {
             scene.background = new THREE.Color(0x121212);
@@ -692,14 +816,15 @@
             setupVirtualKeyboard();
             applyTheme();
 
-            document.getElementById('start-button').addEventListener('click', startGame);
-            document.getElementById('tutorial-button').addEventListener('click', startTutorial);
-            document.getElementById('settings-button').addEventListener('click', showSettingsPanel);
-            document.getElementById('back-to-menu-button').addEventListener('click', showMainMenu);
-            document.getElementById('restart-button').addEventListener('click', startGame);
-            document.getElementById('pause-button').addEventListener('click', togglePause);
-            document.getElementById('resume-button').addEventListener('click', togglePause);
-            document.getElementById('home-button').addEventListener('click', goHome);
+            // UI 버튼에 터치 피드백 적용
+            addTouchFeedback(document.getElementById('start-button'), startGame);
+            addTouchFeedback(document.getElementById('tutorial-button'), startTutorial);
+            addTouchFeedback(document.getElementById('settings-button'), showSettingsPanel);
+            addTouchFeedback(document.getElementById('back-to-menu-button'), showMainMenu);
+            addTouchFeedback(document.getElementById('restart-button'), startGame);
+            addTouchFeedback(document.getElementById('pause-button'), togglePause);
+            addTouchFeedback(document.getElementById('resume-button'), togglePause);
+            addTouchFeedback(document.getElementById('home-button'), goHome);
             
             // 튜토리얼 버튼 이벤트
             tutorialPrevBtn.addEventListener('click', previousTutorialStep);
@@ -755,6 +880,10 @@
                 const parsed = JSON.parse(savedData);
                 gameData.highScore = parsed.highScore || 0;
                 gameData.colorSparks = parsed.colorSparks || 0;
+                gameData.totalScore = parsed.totalScore || 0;
+                gameData.level = parsed.level || 1;
+                gameData.currentSkin = parsed.currentSkin || 'basic';
+                gameData.achievements = parsed.achievements || {};
                 gameSettings.theme = parsed.theme || '선명한 무지개';
                 gameSettings.showVirtualKeyboard = parsed.showVirtualKeyboard !== undefined ? parsed.showVirtualKeyboard : true;
             } else {
@@ -767,6 +896,9 @@
             gameSettings.showVirtualKeyboard = true;
             console.log('강제 설정 후:', gameSettings.showVirtualKeyboard);
             
+            // 진행도 업데이트
+            updateProgressDisplay();
+            
             console.log('최종 설정:', gameSettings);
         }
 
@@ -774,6 +906,10 @@
             localStorage.setItem('chromaStepData', JSON.stringify({
                 highScore: gameData.highScore,
                 colorSparks: gameData.colorSparks,
+                totalScore: gameData.totalScore,
+                level: gameData.level,
+                currentSkin: gameData.currentSkin,
+                achievements: gameData.achievements,
                 theme: gameSettings.theme,
                 showVirtualKeyboard: gameSettings.showVirtualKeyboard
             }));
@@ -866,17 +1002,329 @@
             console.log('최종 classList:', virtualKeyboard.classList);
         }
 
+        // 햅틱 피드백 함수
+        function vibrate(pattern) {
+            if (navigator.vibrate) {
+                navigator.vibrate(pattern);
+            }
+        }
+
+        // 콤보 시각적 피드백 함수
+        function triggerComboFeedback(comboValue) {
+            // 콤보 표시 애니메이션
+            const comboDisplay = document.getElementById('combo-display');
+            comboDisplay.classList.remove('combo-boost');
+            void comboDisplay.offsetWidth; // 강제 리플로우로 애니메이션 재시작
+            comboDisplay.classList.add('combo-boost');
+            
+            // 콤보가 높을수록 더 강한 효과
+            if (comboValue >= 5) {
+                // 화면 플래시 효과
+                const canvasContainer = document.getElementById('canvas-container');
+                canvasContainer.classList.remove('screen-flash');
+                void canvasContainer.offsetWidth;
+                canvasContainer.classList.add('screen-flash');
+                
+                // 카메라 흔들림 효과 (간단한 구현)
+                if (camera) {
+                    const originalY = camera.position.y;
+                    camera.position.y += Math.random() * 2 - 1;
+                    setTimeout(() => {
+                        camera.position.y = originalY;
+                    }, 100);
+                }
+            }
+            
+            // 높은 콤보에서 더 강한 진동
+            if (comboValue >= 10) {
+                vibrate([50, 30, 50, 30, 50]);
+            } else if (comboValue >= 5) {
+                vibrate([80, 50, 80]);
+            }
+        }
+        
+        // 타일 성공 시각적 효과
+        function triggerTileSuccessEffect(tilePosition) {
+            // 파티클 효과는 기존 함수 활용
+            createParticleEffect('success', tilePosition);
+            
+            // 플레이어 바운스 효과
+            if (player && player.mesh) {
+                const originalY = player.mesh.position.y;
+                const bounceHeight = 3;
+                const duration = 400; // 밀리초
+                const startTime = Date.now();
+                
+                const animateBounce = () => {
+                    const elapsed = Date.now() - startTime;
+                    const progress = Math.min(elapsed / duration, 1);
+                    
+                    // 사인 함수로 자연스러운 바운스
+                    const bounceY = Math.sin(progress * Math.PI) * bounceHeight;
+                    player.mesh.position.y = originalY + bounceY;
+                    
+                    if (progress < 1) {
+                        requestAnimationFrame(animateBounce);
+                    } else {
+                        player.mesh.position.y = originalY; // 원래 위치로 복원
+                    }
+                };
+                
+                animateBounce();
+            }
+        }
+
+        // 도전과제 시스템 함수들
+        function checkAchievements() {
+            for (const [id, achievement] of Object.entries(ACHIEVEMENTS)) {
+                if (gameData.achievements[id]) continue; // 이미 달성된 도전과제는 건너뛰기
+                
+                let isAchieved = false;
+                
+                switch (id) {
+                    case 'first_steps':
+                        isAchieved = gameData.sessionStats.tilesPressed >= achievement.target;
+                        break;
+                    case 'combo_starter':
+                    case 'combo_master':
+                    case 'combo_legend':
+                        isAchieved = gameData.sessionStats.maxCombo >= achievement.target;
+                        break;
+                    case 'score_hunter':
+                    case 'score_champion':
+                        isAchieved = gameData.score >= achievement.target;
+                        break;
+                    case 'time_survivor':
+                        isAchieved = gameData.sessionStats.survivalTime >= achievement.target;
+                        break;
+                    case 'special_collector':
+                        isAchieved = gameData.sessionStats.specialBlocksCollected >= achievement.target;
+                        break;
+                }
+                
+                if (isAchieved) {
+                    unlockAchievement(id, achievement);
+                }
+            }
+        }
+
+        function unlockAchievement(id, achievement) {
+            gameData.achievements[id] = true;
+            gameData.totalScore += achievement.reward;
+            
+            showAchievementNotification(achievement);
+            vibrate([50, 100, 50, 100, 150]); // 도전과제 달성 진동
+            
+            // 레벨 체크 (보상 점수로 인한)
+            const oldLevel = gameData.level;
+            gameData.level = calculateLevel(gameData.totalScore);
+            if (gameData.level > oldLevel) {
+                showLevelUpNotification(gameData.level);
+            }
+            
+            updateProgressDisplay();
+        }
+
+        function showAchievementNotification(achievement) {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed; top: 120px; left: 50%; transform: translateX(-50%);
+                z-index: 9999; background: linear-gradient(45deg, #ff6b35, #f7931e);
+                color: white; padding: 12px 25px; border-radius: 20px;
+                font-size: 1.1rem; font-weight: bold; text-align: center;
+                box-shadow: 0 4px 20px rgba(255, 107, 53, 0.5);
+                animation: fadeIn 0.5s ease-out;
+                max-width: 300px; word-wrap: break-word;
+            `;
+            notification.innerHTML = `
+                🏆 도전과제 달성!<br>
+                <span style="font-size: 1rem;">${achievement.name}</span><br>
+                <span style="font-size: 0.9rem; opacity: 0.9;">+${achievement.reward} EXP</span>
+            `;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.animation = 'fadeOut 0.5s ease-out forwards';
+                setTimeout(() => notification.remove(), 500);
+            }, 4000);
+        }
+
+        function updateSessionStats() {
+            // 세션 중 최대 콤보 업데이트
+            if (gameData.combo > gameData.sessionStats.maxCombo) {
+                gameData.sessionStats.maxCombo = gameData.combo;
+            }
+            
+            // 생존 시간 업데이트 (시작 시간 - 현재 시간)
+            gameData.sessionStats.survivalTime = GAME_CONFIG.INITIAL_TIME - gameData.time;
+        }
+
+        // 레벨 시스템 함수들
+        function calculateLevel(totalScore) {
+            for (let i = REWARD_SYSTEM.levels.length - 1; i >= 0; i--) {
+                if (totalScore >= REWARD_SYSTEM.levels[i]) {
+                    return i + 1;
+                }
+            }
+            return 1;
+        }
+
+        function getExpForNextLevel(level) {
+            if (level >= REWARD_SYSTEM.levels.length) {
+                return REWARD_SYSTEM.levels[REWARD_SYSTEM.levels.length - 1];
+            }
+            return REWARD_SYSTEM.levels[level];
+        }
+
+        function updatePlayerProgress(scoreGained) {
+            const oldLevel = gameData.level;
+            gameData.totalScore += scoreGained;
+            gameData.level = calculateLevel(gameData.totalScore);
+            
+            // 레벨업 체크
+            if (gameData.level > oldLevel) {
+                showLevelUpNotification(gameData.level);
+                vibrate([100, 50, 100, 50, 200]); // 레벨업 진동
+                
+                // 새로운 스킨 언락 체크
+                const unlockedSkins = REWARD_SYSTEM.skins.filter(skin => 
+                    skin.unlockLevel === gameData.level
+                );
+                if (unlockedSkins.length > 0) {
+                    showSkinUnlockNotification(unlockedSkins[0]);
+                }
+            }
+            
+            updateProgressDisplay();
+        }
+
+        function updateProgressDisplay() {
+            if (!playerLevelDisplay) return;
+            
+            playerLevelDisplay.textContent = gameData.level;
+            
+            const currentLevelReq = REWARD_SYSTEM.levels[gameData.level - 1] || 0;
+            const nextLevelReq = getExpForNextLevel(gameData.level);
+            const progress = gameData.totalScore - currentLevelReq;
+            const needed = nextLevelReq - currentLevelReq;
+            
+            if (expDisplay) expDisplay.textContent = progress;
+            if (expNeededDisplay) expNeededDisplay.textContent = needed;
+            
+            if (expBar) {
+                const percentage = Math.min((progress / needed) * 100, 100);
+                expBar.style.width = `${percentage}%`;
+            }
+        }
+
+        function showLevelUpNotification(newLevel) {
+            // 간단한 레벨업 알림 (화면 상단에 표시)
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+                z-index: 9999; background: linear-gradient(45deg, var(--color-cyan), var(--color-yellow));
+                color: black; padding: 15px 30px; border-radius: 25px;
+                font-size: 1.3rem; font-weight: bold; text-align: center;
+                box-shadow: 0 4px 20px rgba(0, 255, 255, 0.5);
+                animation: fadeIn 0.5s ease-out;
+            `;
+            notification.textContent = `🎉 레벨 ${newLevel} 달성! 🎉`;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.animation = 'fadeOut 0.5s ease-out forwards';
+                setTimeout(() => notification.remove(), 500);
+            }, 3000);
+        }
+
+        function showSkinUnlockNotification(skin) {
+            // 스킨 언락 알림
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed; top: 80px; left: 50%; transform: translateX(-50%);
+                z-index: 9999; background: rgba(0, 0, 0, 0.9);
+                color: var(--color-yellow); padding: 12px 25px; border-radius: 20px;
+                font-size: 1.1rem; font-weight: bold; text-align: center;
+                border: 2px solid var(--color-yellow);
+                animation: fadeIn 0.5s ease-out;
+            `;
+            notification.textContent = `✨ ${skin.name} 스킨 언락! ✨`;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.animation = 'fadeOut 0.5s ease-out forwards';
+                setTimeout(() => notification.remove(), 500);
+            }, 3000);
+        }
+
+        function applySkinToPlayer() {
+            if (!player || !player.mesh) return;
+            
+            const currentSkin = REWARD_SYSTEM.skins.find(skin => skin.id === gameData.currentSkin);
+            if (currentSkin) {
+                player.mesh.material.color.setHex(currentSkin.color);
+                // 특별한 효과들
+                if (currentSkin.id === 'rainbow') {
+                    // 무지개 효과는 시간에 따라 색상 변화
+                    player.mesh.material.emissive.setHex(0x404040);
+                    player.mesh.material.emissiveIntensity = 0.3;
+                } else if (currentSkin.id === 'crystal') {
+                    // 크리스탈 효과
+                    player.mesh.material.transparent = true;
+                    player.mesh.material.opacity = 0.8;
+                    player.mesh.material.emissive.setHex(currentSkin.color);
+                    player.mesh.material.emissiveIntensity = 0.2;
+                }
+            }
+        }
+
+        // 터치 피드백 함수
+        function addTouchFeedback(element, callback, vibrationPattern = [50]) {
+            let touchStarted = false;
+            
+            // 터치 시작
+            element.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                touchStarted = true;
+                element.style.transform = 'scale(0.95)';
+                element.style.filter = 'brightness(1.2)';
+                vibrate(vibrationPattern);
+            }, { passive: false });
+            
+            // 터치 끝
+            element.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                if (touchStarted) {
+                    element.style.transform = '';
+                    element.style.filter = '';
+                    callback();
+                    touchStarted = false;
+                }
+            }, { passive: false });
+            
+            // 터치 취소 (화면 밖으로 드래그 등)
+            element.addEventListener('touchcancel', (e) => {
+                e.preventDefault();
+                element.style.transform = '';
+                element.style.filter = '';
+                touchStarted = false;
+            }, { passive: false });
+            
+            // 마우스 이벤트도 유지 (데스크톱 호환성)
+            element.addEventListener('click', callback);
+        }
+
         function setupVirtualKeyboard() {
-            // 가상 키보드 버튼 이벤트 설정
+            // 가상 키보드 버튼 이벤트 설정 (터치 최적화)
             const keyUp = document.getElementById('key-up');
             const keyDown = document.getElementById('key-down');
             const keyLeft = document.getElementById('key-left');
             const keyRight = document.getElementById('key-right');
             
-            if (keyUp) keyUp.addEventListener('click', () => handleVirtualKey('ArrowUp'));
-            if (keyDown) keyDown.addEventListener('click', () => handleVirtualKey('ArrowDown'));
-            if (keyLeft) keyLeft.addEventListener('click', () => handleVirtualKey('ArrowLeft'));
-            if (keyRight) keyRight.addEventListener('click', () => handleVirtualKey('ArrowRight'));
+            if (keyUp) addTouchFeedback(keyUp, () => handleVirtualKey('ArrowUp'), [30]);
+            if (keyDown) addTouchFeedback(keyDown, () => handleVirtualKey('ArrowDown'), [30]);
+            if (keyLeft) addTouchFeedback(keyLeft, () => handleVirtualKey('ArrowLeft'), [30]);
+            if (keyRight) addTouchFeedback(keyRight, () => handleVirtualKey('ArrowRight'), [30]);
             
             // 체크박스 이벤트 설정
             if (keyboardToggle) {
@@ -919,6 +1367,14 @@
             gameData.time = GAME_CONFIG.INITIAL_TIME;
             gameData.combo = 1;
             gameData.currentMission = [];
+            
+            // 세션 통계 초기화
+            gameData.sessionStats = {
+                tilesPressed: 0,
+                maxCombo: 0,
+                specialBlocksCollected: 0,
+                survivalTime: 0
+            };
             
             // 메모리 누수 방지: 모든 타임아웃 정리
             clearAllTimeouts();
@@ -973,6 +1429,9 @@
             sparksEarnedDisplay.textContent = sparks.toLocaleString();
             gameData.colorSparks += sparks;
             
+            // 진행도 업데이트 (현재 게임 점수로)
+            updatePlayerProgress(gameData.score);
+            
             saveGameData();
             highScoreDisplay.textContent = gameData.highScore.toLocaleString();
             updateVirtualKeyboard();
@@ -981,7 +1440,11 @@
         function update(deltaTime) {
             if (gameState !== 'PLAYING' || !player) return;
 
-            gameData.time -= deltaTime;
+            // 동적 시간 감소 (시간이 지날수록 더 빠르게 감소)
+            const elapsedTime = GAME_CONFIG.INITIAL_TIME - gameData.time;
+            const difficultyMultiplier = 1 + (elapsedTime / 60) * (GAME_CONFIG.TIME_DECAY_RATE - 1);
+            
+            gameData.time -= deltaTime * difficultyMultiplier;
             if (gameData.time <= 0) {
                 gameData.time = 0;
                 gameOver();
@@ -998,6 +1461,14 @@
             updateWorld();
             updateUI();
             updateTiles();
+            
+            // 세션 통계 및 도전과제 업데이트
+            updateSessionStats();
+            
+            // 주기적으로 도전과제 체크 (시간 기반 도전과제 등)
+            if (Math.floor(gameData.time) !== Math.floor(gameData.time + deltaTime)) {
+                checkAchievements();
+            }
         }
 
         function updateUI() {
@@ -1022,6 +1493,9 @@
             player.mesh.castShadow = true;
             player.mesh.position.copy(player.targetPosition);
             scene.add(player.mesh);
+            
+            // 현재 스킨 적용
+            applySkinToPlayer();
         }
 
         function handleInput(event) {
@@ -1079,16 +1553,26 @@
         function handleStepOnTile(tile) {
             tile.isDeactivated = true; 
             
+            // 세션 통계 업데이트 (모든 타일에 대해)
+            gameData.sessionStats.tilesPressed++;
+            
             // 이벤트 블록 처리
             if (tile.eventBlockType) {
+                gameData.sessionStats.specialBlocksCollected++;
                 handleEventBlock(tile.eventBlockType);
                 deactivateAndScheduleReactivation(tile);
+                vibrate([80, 50, 80]); // 특수 블록 진동 패턴
+                
+                // 도전과제 체크
+                checkAchievements();
                 return;
             }
             
             const expectedColorIndex = gameData.currentMission[0];
 
             if (tile.colorIndex === expectedColorIndex) {
+                // 성공 시 햅틱 피드백
+                vibrate([100]);
                 const missionIcon = missionDisplay.firstChild;
                 if (missionIcon) {
                     missionIcon.classList.add('mission-success-anim');
@@ -1102,6 +1586,12 @@
 
                 gameData.score += Math.round(GAME_CONFIG.BASE_SCORE_PER_TILE * (1.0 + (gameData.combo - 1) * GAME_CONFIG.COMBO_MULTIPLIER));
                 gameData.combo++;
+                
+                // 콤보 시각적 피드백 트리거
+                triggerComboFeedback(gameData.combo);
+                
+                // 타일 성공 효과
+                triggerTileSuccessEffect(player.mesh.position);
                 
                 // 튜토리얼 상태가 아닐 때만 시간 업데이트
                 if (gameState !== 'TUTORIAL') {
@@ -1122,7 +1612,12 @@
                 addNewMission();
                 ensureMissionTileExists();
                 updateMissionUI();
+                
+                // 도전과제 체크 (성공적인 타일 밟기 후)
+                checkAchievements();
             } else {
+                // 실패 시 햅틱 피드백
+                vibrate([200, 100, 200]);
                 gameData.combo = 1;
                 // 튜토리얼 상태가 아닐 때만 시간 페널티
                 if (gameState !== 'TUTORIAL') {
@@ -1281,6 +1776,16 @@
         }
 
         function deactivateAndScheduleReactivation(tile) {
+            // 타일 밟기 애니메이션 효과
+            tile.mesh.material.emissive.setHex(0xffffff);
+            tile.mesh.material.emissiveIntensity = 0.5;
+            
+            // 즉시 원래 색으로 복원한 후 서서히 어둡게
+            setTimeout(() => {
+                tile.mesh.material.emissive.setHex(0x000000);
+                tile.mesh.material.emissiveIntensity = 0;
+            }, 200);
+            
             tile.targetY = -GAME_CONFIG.TILE_SIZE;
             tile.mesh.material.color.set(DEACTIVATED_COLOR);
             tile.mesh.castShadow = false;
