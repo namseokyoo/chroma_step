@@ -211,6 +211,11 @@
             width: 20px; height: 20px; cursor: pointer;
         }
 
+        /* 튜토리얼 모바일 최적화 */
+        #tutorial-content {
+            transition: all 0.3s ease;
+        }
+        
         /* 모바일 HUD 최적화 */
         @media (max-width: 768px) {
             #hud {
@@ -239,6 +244,51 @@
                 width: 35px;
                 height: 35px;
                 font-size: 1.2rem;
+            }
+            
+            /* 튜토리얼 모바일 최적화 */
+            #tutorial-content {
+                top: 10px !important;
+                max-width: 95% !important;
+                padding: 15px !important;
+                width: auto !important;
+                max-height: 200px;
+                overflow-y: auto;
+            }
+            
+            #tutorial-title {
+                font-size: 1.1rem !important;
+            }
+            
+            #tutorial-description {
+                font-size: 1rem !important;
+                margin-bottom: 15px !important;
+            }
+            
+            #tutorial-controls {
+                flex-direction: column;
+                gap: 8px !important;
+            }
+            
+            #tutorial-controls > div {
+                display: flex;
+                justify-content: center;
+                gap: 8px;
+            }
+            
+            #tutorial-skip, #tutorial-prev, #tutorial-next {
+                font-size: 0.9rem !important;
+                padding: 8px 16px !important;
+                flex: 1;
+                max-width: 120px;
+            }
+        }
+        
+        /* 작은 모바일 화면 (아이폰 SE 등) */
+        @media (max-width: 480px) {
+            #tutorial-content {
+                top: 5px !important;
+                max-height: 180px;
             }
         }
     </style>
@@ -314,19 +364,19 @@
             
             <!-- 튜토리얼 오버레이 -->
             <div id="tutorial-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.7); z-index: 2000;">
-                <div id="tutorial-content" style="position: absolute; bottom: 20px; right: 20px; max-width: 400px; background: rgba(255, 255, 255, 0.95); padding: 20px; border-radius: 10px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);">
+                <div id="tutorial-content" style="position: absolute; top: 20px; left: 50%; transform: translateX(-50%); max-width: 90%; width: 400px; background: rgba(255, 255, 255, 0.95); padding: 20px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);">
                     <div id="tutorial-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                        <h3 id="tutorial-title" style="margin: 0; font-size: 1.2rem; color: #333;">튜토리얼</h3>
-                        <span id="tutorial-progress" style="font-size: 0.9rem; color: #666;">1/7</span>
+                        <h3 id="tutorial-title" style="margin: 0; font-size: 1.3rem; color: #333; font-weight: bold;">튜토리얼</h3>
+                        <span id="tutorial-progress" style="font-size: 1rem; color: #666; font-weight: bold;">1/7</span>
                     </div>
-                    <div id="tutorial-description" style="margin-bottom: 20px; font-size: 1rem; color: #333; line-height: 1.4;">
+                    <div id="tutorial-description" style="margin-bottom: 20px; font-size: 1.1rem; color: #333; line-height: 1.5; text-align: center;">
                         게임을 시작하겠습니다!
                     </div>
                     <div id="tutorial-controls" style="display: flex; justify-content: space-between; gap: 10px;">
-                        <button id="tutorial-skip" class="ui-button" style="background: #666; font-size: 0.9rem; padding: 8px 16px;">건너뛰기</button>
+                        <button id="tutorial-skip" class="ui-button" style="background: #666; font-size: 1rem; padding: 10px 18px;">건너뛰기</button>
                         <div style="display: flex; gap: 10px;">
-                            <button id="tutorial-prev" class="ui-button" style="font-size: 0.9rem; padding: 8px 16px;" disabled>이전</button>
-                            <button id="tutorial-next" class="ui-button" style="font-size: 0.9rem; padding: 8px 16px;">다음</button>
+                            <button id="tutorial-prev" class="ui-button" style="font-size: 1rem; padding: 10px 18px;" disabled>이전</button>
+                            <button id="tutorial-next" class="ui-button" style="font-size: 1rem; padding: 10px 18px;">다음</button>
                         </div>
                     </div>
                 </div>
@@ -422,6 +472,49 @@
             ]
         };
 
+        // 미션 시스템 확장
+        const MISSION_TYPES = {
+            SINGLE_COLOR: 'single_color',      // 기존: 단일 색상
+            SEQUENCE: 'sequence',              // 연속 색상 (빨강->파랑->초록)
+            DOUBLE: 'double',                  // 같은 색상 2개 연속
+            RAINBOW: 'rainbow',                // 모든 색상 한번씩
+            TIME_RUSH: 'time_rush',            // 제한 시간 내 N개
+            PATTERN: 'pattern'                 // 특정 패턴 (L자, 십자 등)
+        };
+
+        const MISSION_CONFIGS = {
+            [MISSION_TYPES.SINGLE_COLOR]: {
+                name: '색상 매칭',
+                description: '지정된 색상 밟기',
+                baseReward: 100,
+                icon: '●'
+            },
+            [MISSION_TYPES.SEQUENCE]: {
+                name: '색상 순서',
+                description: '순서대로 색상 밟기',
+                baseReward: 200,
+                icon: '→'
+            },
+            [MISSION_TYPES.DOUBLE]: {
+                name: '더블 매치',
+                description: '같은 색상 2번 연속',
+                baseReward: 150,
+                icon: '●●'
+            },
+            [MISSION_TYPES.RAINBOW]: {
+                name: '무지개',
+                description: '모든 색상 한번씩',
+                baseReward: 300,
+                icon: '🌈'
+            },
+            [MISSION_TYPES.TIME_RUSH]: {
+                name: '타임 러시',
+                description: '5초 내 3개 색상',
+                baseReward: 250,
+                icon: '⏰'
+            }
+        };
+
         // 도전과제 시스템
         const ACHIEVEMENTS = {
             first_steps: { name: '첫 걸음', desc: '첫 번째 타일 밟기', target: 1, reward: 50 },
@@ -452,7 +545,13 @@
                 maxCombo: 0,
                 specialBlocksCollected: 0,
                 survivalTime: 0
-            }
+            },
+            // 확장된 미션 시스템
+            currentMissionType: MISSION_TYPES.SINGLE_COLOR,
+            missionProgress: [],
+            rainbowProgress: new Set(),
+            timeRushStartTime: 0,
+            missionStartTime: 0
         };
         let gameSettings = {
             theme: '선명한 무지개',
@@ -826,10 +925,10 @@
             addTouchFeedback(document.getElementById('resume-button'), togglePause);
             addTouchFeedback(document.getElementById('home-button'), goHome);
             
-            // 튜토리얼 버튼 이벤트
-            tutorialPrevBtn.addEventListener('click', previousTutorialStep);
-            tutorialNextBtn.addEventListener('click', nextTutorialStep);
-            tutorialSkipBtn.addEventListener('click', exitTutorial);
+            // 튜토리얼 버튼 이벤트 (터치 피드백 추가)
+            addTouchFeedback(tutorialPrevBtn, previousTutorialStep);
+            addTouchFeedback(tutorialNextBtn, nextTutorialStep);
+            addTouchFeedback(tutorialSkipBtn, exitTutorial);
             
             window.addEventListener('keydown', handleInput);
             window.addEventListener('resize', () => {
@@ -1149,6 +1248,53 @@
             }, 4000);
         }
 
+        // 시간 기반 미션 체크
+        function checkTimeBasedMissions() {
+            const currentMission = gameData.currentMission[0];
+            if (!currentMission || currentMission.type !== MISSION_TYPES.TIME_RUSH) return;
+            
+            const elapsed = Date.now() - currentMission.startTime;
+            if (elapsed > currentMission.timeLimit) {
+                // 타임 러시 실패
+                showMissionFailedEffect('시간 초과!');
+                gameData.currentMission.shift();
+                addNewMission();
+                ensureMissionTileExists();
+                updateMissionUI();
+                
+                // 콤보 리셋 및 페널티
+                gameData.combo = 1;
+                gameData.time -= 3; // 3초 페널티
+                vibrate([200, 100, 200, 100, 200]);
+            } else {
+                // UI 업데이트 (타이머)
+                updateMissionUI();
+            }
+        }
+        
+        function showMissionFailedEffect(message) {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+                z-index: 9999; background: linear-gradient(45deg, #ff4444, #cc0000);
+                color: white; padding: 15px 30px; border-radius: 20px;
+                font-size: 1.3rem; font-weight: bold; text-align: center;
+                box-shadow: 0 8px 30px rgba(255, 68, 68, 0.5);
+                animation: fadeIn 0.3s ease-out;
+                pointer-events: none;
+            `;
+            notification.innerHTML = `
+                <div style="font-size: 1.5rem; margin-bottom: 5px;">❌</div>
+                <div>${message}</div>
+            `;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.animation = 'fadeOut 0.5s ease-out forwards';
+                setTimeout(() => notification.remove(), 500);
+            }, 1500);
+        }
+
         function updateSessionStats() {
             // 세션 중 최대 콤보 업데이트
             if (gameData.combo > gameData.sessionStats.maxCombo) {
@@ -1376,6 +1522,12 @@
                 survivalTime: 0
             };
             
+            // 확장된 미션 시스템 초기화
+            gameData.missionProgress = [];
+            gameData.rainbowProgress = new Set();
+            gameData.timeRushStartTime = 0;
+            gameData.missionStartTime = Date.now();
+            
             // 메모리 누수 방지: 모든 타임아웃 정리
             clearAllTimeouts();
             
@@ -1464,6 +1616,9 @@
             
             // 세션 통계 및 도전과제 업데이트
             updateSessionStats();
+            
+            // 타임 러시 미션 시간 체크
+            checkTimeBasedMissions();
             
             // 주기적으로 도전과제 체크 (시간 기반 도전과제 등)
             if (Math.floor(gameData.time) !== Math.floor(gameData.time + deltaTime)) {
@@ -1568,23 +1723,22 @@
                 return;
             }
             
-            const expectedColorIndex = gameData.currentMission[0];
+            const result = checkMissionProgress(tile.colorIndex);
 
-            if (tile.colorIndex === expectedColorIndex) {
+            if (result.success) {
                 // 성공 시 햅틱 피드백
                 vibrate([100]);
-                const missionIcon = missionDisplay.firstChild;
-                if (missionIcon) {
-                    missionIcon.classList.add('mission-success-anim');
-                    // 애니메이션 완료 후 아이콘 제거
-                    setTimeout(() => {
-                        if (missionIcon.parentNode) {
-                            missionIcon.remove();
-                        }
-                    }, 500);
+                
+                // 미션 완료 시 추가 보상
+                let scoreMultiplier = 1.0;
+                if (result.missionCompleted) {
+                    scoreMultiplier = MISSION_CONFIGS[result.missionType]?.baseReward / 100 || 1.0;
+                    
+                    // 미션 완료 시각적 효과
+                    showMissionCompleteEffect(result.missionType);
                 }
 
-                gameData.score += Math.round(GAME_CONFIG.BASE_SCORE_PER_TILE * (1.0 + (gameData.combo - 1) * GAME_CONFIG.COMBO_MULTIPLIER));
+                gameData.score += Math.round(GAME_CONFIG.BASE_SCORE_PER_TILE * scoreMultiplier * (1.0 + (gameData.combo - 1) * GAME_CONFIG.COMBO_MULTIPLIER));
                 gameData.combo++;
                 
                 // 콤보 시각적 피드백 트리거
@@ -1595,7 +1749,7 @@
                 
                 // 튜토리얼 상태가 아닐 때만 시간 업데이트
                 if (gameState !== 'TUTORIAL') {
-                    gameData.time += GAME_CONFIG.TIME_REWARD_BASE;
+                    gameData.time += GAME_CONFIG.TIME_REWARD_BASE * scoreMultiplier;
                 }
                 
                 // 튜토리얼 상태에서 올바른 타일 밟기 완료 표시
@@ -1607,10 +1761,13 @@
                     }
                 }
                 
-                // 레이스 컨디션 수정: 즉시 미션 업데이트
-                gameData.currentMission.shift();
-                addNewMission();
-                ensureMissionTileExists();
+                // 미션 완료 시 새 미션 생성
+                if (result.missionCompleted) {
+                    gameData.currentMission.shift();
+                    addNewMission();
+                    ensureMissionTileExists();
+                }
+                
                 updateMissionUI();
                 
                 // 도전과제 체크 (성공적인 타일 밟기 후)
@@ -1619,6 +1776,12 @@
                 // 실패 시 햅틱 피드백
                 vibrate([200, 100, 200]);
                 gameData.combo = 1;
+                
+                // 미션 실패 시 진행도 리셋 (특정 미션 타입)
+                if (result.resetProgress) {
+                    resetCurrentMissionProgress();
+                }
+                
                 // 튜토리얼 상태가 아닐 때만 시간 페널티
                 if (gameState !== 'TUTORIAL') {
                     gameData.time -= GAME_CONFIG.TIME_PENALTY_PER_MOVE;
@@ -1629,69 +1792,308 @@
             deactivateAndScheduleReactivation(tile);
         }
 
+        // 새로운 미션 생성 (확장된 버전)
+        function generateNewMission() {
+            // 레벨에 따른 미션 타입 확률 조정
+            const level = gameData.level;
+            let missionTypeWeights = {
+                [MISSION_TYPES.SINGLE_COLOR]: 60,
+                [MISSION_TYPES.DOUBLE]: level >= 2 ? 20 : 0,
+                [MISSION_TYPES.SEQUENCE]: level >= 3 ? 15 : 0,
+                [MISSION_TYPES.RAINBOW]: level >= 5 ? 10 : 0,
+                [MISSION_TYPES.TIME_RUSH]: level >= 4 ? 5 : 0
+            };
+            
+            // 가중치 기반 랜덤 선택
+            const totalWeight = Object.values(missionTypeWeights).reduce((a, b) => a + b, 0);
+            let random = Math.random() * totalWeight;
+            
+            for (const [type, weight] of Object.entries(missionTypeWeights)) {
+                random -= weight;
+                if (random <= 0) {
+                    return generateMissionOfType(type);
+                }
+            }
+            
+            // 폴백: 기본 미션
+            return generateMissionOfType(MISSION_TYPES.SINGLE_COLOR);
+        }
+        
+        function generateMissionOfType(missionType) {
+            const colors = currentThemeColors;
+            
+            switch (missionType) {
+                case MISSION_TYPES.SINGLE_COLOR:
+                    return {
+                        type: missionType,
+                        target: [Math.floor(Math.random() * colors.length)],
+                        progress: 0,
+                        maxProgress: 1
+                    };
+                    
+                case MISSION_TYPES.DOUBLE:
+                    const colorIndex = Math.floor(Math.random() * colors.length);
+                    return {
+                        type: missionType,
+                        target: [colorIndex, colorIndex],
+                        progress: 0,
+                        maxProgress: 2
+                    };
+                    
+                case MISSION_TYPES.SEQUENCE:
+                    const sequenceLength = 3;
+                    const sequence = [];
+                    for (let i = 0; i < sequenceLength; i++) {
+                        sequence.push(Math.floor(Math.random() * colors.length));
+                    }
+                    return {
+                        type: missionType,
+                        target: sequence,
+                        progress: 0,
+                        maxProgress: sequenceLength
+                    };
+                    
+                case MISSION_TYPES.RAINBOW:
+                    return {
+                        type: missionType,
+                        target: Array.from({length: colors.length}, (_, i) => i),
+                        progress: 0,
+                        maxProgress: colors.length,
+                        collected: new Set()
+                    };
+                    
+                case MISSION_TYPES.TIME_RUSH:
+                    return {
+                        type: missionType,
+                        target: Array.from({length: 3}, () => Math.floor(Math.random() * colors.length)),
+                        progress: 0,
+                        maxProgress: 3,
+                        timeLimit: 5000, // 5초
+                        startTime: Date.now()
+                    };
+                    
+                default:
+                    return generateMissionOfType(MISSION_TYPES.SINGLE_COLOR);
+            }
+        }
+
+        // 미션 진행도 체크 함수
+        function checkMissionProgress(colorIndex) {
+            const currentMission = gameData.currentMission[0];
+            if (!currentMission) return { success: false };
+            
+            switch (currentMission.type) {
+                case MISSION_TYPES.SINGLE_COLOR:
+                    if (colorIndex === currentMission.target[0]) {
+                        return { success: true, missionCompleted: true, missionType: currentMission.type };
+                    }
+                    break;
+                    
+                case MISSION_TYPES.DOUBLE:
+                    if (colorIndex === currentMission.target[currentMission.progress]) {
+                        currentMission.progress++;
+                        if (currentMission.progress >= currentMission.maxProgress) {
+                            return { success: true, missionCompleted: true, missionType: currentMission.type };
+                        }
+                        return { success: true, missionCompleted: false };
+                    } else {
+                        return { success: false, resetProgress: true };
+                    }
+                    break;
+                    
+                case MISSION_TYPES.SEQUENCE:
+                    if (colorIndex === currentMission.target[currentMission.progress]) {
+                        currentMission.progress++;
+                        if (currentMission.progress >= currentMission.maxProgress) {
+                            return { success: true, missionCompleted: true, missionType: currentMission.type };
+                        }
+                        return { success: true, missionCompleted: false };
+                    } else {
+                        return { success: false, resetProgress: true };
+                    }
+                    break;
+                    
+                case MISSION_TYPES.RAINBOW:
+                    if (currentMission.target.includes(colorIndex) && !currentMission.collected.has(colorIndex)) {
+                        currentMission.collected.add(colorIndex);
+                        currentMission.progress++;
+                        if (currentMission.progress >= currentMission.maxProgress) {
+                            return { success: true, missionCompleted: true, missionType: currentMission.type };
+                        }
+                        return { success: true, missionCompleted: false };
+                    }
+                    break;
+                    
+                case MISSION_TYPES.TIME_RUSH:
+                    // 시간 체크
+                    const elapsed = Date.now() - currentMission.startTime;
+                    if (elapsed > currentMission.timeLimit) {
+                        return { success: false, resetProgress: true };
+                    }
+                    
+                    if (currentMission.target.includes(colorIndex)) {
+                        // 이미 밟은 색상인지 체크
+                        const targetIndex = currentMission.target.findIndex((color, idx) => 
+                            color === colorIndex && idx >= currentMission.progress
+                        );
+                        
+                        if (targetIndex !== -1) {
+                            currentMission.progress++;
+                            if (currentMission.progress >= currentMission.maxProgress) {
+                                return { success: true, missionCompleted: true, missionType: currentMission.type };
+                            }
+                            return { success: true, missionCompleted: false };
+                        }
+                    }
+                    break;
+            }
+            
+            return { success: false };
+        }
+        
+        function resetCurrentMissionProgress() {
+            const currentMission = gameData.currentMission[0];
+            if (!currentMission) return;
+            
+            currentMission.progress = 0;
+            if (currentMission.collected) {
+                currentMission.collected.clear();
+            }
+            if (currentMission.type === MISSION_TYPES.TIME_RUSH) {
+                currentMission.startTime = Date.now();
+            }
+        }
+        
+        function showMissionCompleteEffect(missionType) {
+            const config = MISSION_CONFIGS[missionType];
+            if (!config) return;
+            
+            // 화면 중앙에 미션 완료 알림
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+                z-index: 9999; background: linear-gradient(45deg, #ff6b35, #f7931e);
+                color: white; padding: 20px 40px; border-radius: 25px;
+                font-size: 1.5rem; font-weight: bold; text-align: center;
+                box-shadow: 0 8px 30px rgba(255, 107, 53, 0.5);
+                animation: fadeIn 0.3s ease-out;
+                pointer-events: none;
+            `;
+            notification.innerHTML = `
+                <div style="font-size: 2rem; margin-bottom: 10px;">${config.icon}</div>
+                <div>${config.name} 완료!</div>
+                <div style="font-size: 1rem; opacity: 0.9;">+${config.baseReward} 점수!</div>
+            `;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.animation = 'fadeOut 0.5s ease-out forwards';
+                setTimeout(() => notification.remove(), 500);
+            }, 1500);
+            
+            // 특별한 진동 패턴
+            vibrate([100, 50, 100, 50, 200]);
+        }
+
+        // 기존 함수 호환성을 위한 래퍼
         function addNewMission() {
-            const newColorIndex = Math.floor(Math.random() * currentThemeColors.length);
-            gameData.currentMission.push(newColorIndex);
+            const newMission = generateNewMission();
+            gameData.currentMission.push(newMission);
+            gameData.missionStartTime = Date.now();
         }
 
         function ensureMissionTileExists() {
-            const nextMissionIndex = gameData.currentMission[0];
-            if (nextMissionIndex === undefined) return;
-
-            let missionTileExists = false;
+            const currentMission = gameData.currentMission[0];
+            if (!currentMission) return;
+            
+            const requiredColors = getRequiredColorsForMission(currentMission);
+            
+            for (const colorIndex of requiredColors) {
+                if (!hasAccessibleTileOfColor(colorIndex)) {
+                    createTileOfColor(colorIndex);
+                }
+            }
+        }
+        
+        function getRequiredColorsForMission(mission) {
+            switch (mission.type) {
+                case MISSION_TYPES.SINGLE_COLOR:
+                    return [mission.target[0]];
+                    
+                case MISSION_TYPES.DOUBLE:
+                    return [mission.target[mission.progress]];
+                    
+                case MISSION_TYPES.SEQUENCE:
+                    return [mission.target[mission.progress]];
+                    
+                case MISSION_TYPES.RAINBOW:
+                    return mission.target.filter(color => !mission.collected.has(color));
+                    
+                case MISSION_TYPES.TIME_RUSH:
+                    return mission.target.filter((color, idx) => idx >= mission.progress);
+                    
+                default:
+                    return [];
+            }
+        }
+        
+        function hasAccessibleTileOfColor(colorIndex) {
             for (const tile of tiles.values()) {
-                if (tile.colorIndex === nextMissionIndex && !tile.isDeactivated) {
-                    missionTileExists = true;
-                    break;
+                if (tile.colorIndex === colorIndex && !tile.isDeactivated) {
+                    const distance = Math.sqrt((tile.gridX - player.gridX)**2 + (tile.gridY - player.gridY)**2);
+                    if (distance <= 10) { // 적당한 거리 내에 있음
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+        
+        function createTileOfColor(colorIndex) {
+            // 접근 가능한 타일을 우선적으로 선택 (플레이어 주변 타일)
+            const accessibleTiles = [];
+            const nearbyTiles = [];
+            
+            for (const tile of tiles.values()) {
+                if (!tile.isDeactivated && !tile.eventBlockType) {
+                    const distance = Math.sqrt((tile.gridX - player.gridX)**2 + (tile.gridY - player.gridY)**2);
+                    
+                    // 플레이어와 인접한 타일 (거리 1-3)
+                    if (distance <= 3 && distance > 0) {
+                        accessibleTiles.push(tile);
+                    } 
+                    // 그 외 근처 타일 (거리 4-8)
+                    else if (distance <= 8 && distance > 3) {
+                        nearbyTiles.push(tile);
+                    }
                 }
             }
 
-            if (!missionTileExists) {
-                // 접근 가능한 타일을 우선적으로 선택 (플레이어 주변 타일)
-                const accessibleTiles = [];
-                const nearbyTiles = [];
-                
-                for (const tile of tiles.values()) {
-                    if (tile.colorIndex !== nextMissionIndex && !tile.isDeactivated) {
-                        const distance = Math.sqrt((tile.gridX - player.gridX)**2 + (tile.gridY - player.gridY)**2);
-                        
-                        // 플레이어와 인접한 타일 (거리 1-2)
-                        if (distance <= 2 && distance > 0) {
-                            accessibleTiles.push(tile);
-                        } 
-                        // 그 외 근처 타일 (거리 3-5)
-                        else if (distance <= 5 && distance > 2) {
-                            nearbyTiles.push(tile);
-                        }
-                    }
+            let targetTile = null;
+            
+            // 1순위: 접근 가능한 타일
+            if (accessibleTiles.length > 0) {
+                targetTile = accessibleTiles[Math.floor(Math.random() * accessibleTiles.length)];
+            } 
+            // 2순위: 근처 타일
+            else if (nearbyTiles.length > 0) {
+                targetTile = nearbyTiles[Math.floor(Math.random() * nearbyTiles.length)];
+            } 
+            // 3순위: 아무 타일
+            else {
+                const allTiles = Array.from(tiles.values()).filter(t => 
+                    !t.isDeactivated && 
+                    !t.eventBlockType &&
+                    (t.gridX !== player.gridX || t.gridY !== player.gridY)
+                );
+                if (allTiles.length > 0) {
+                    targetTile = allTiles[Math.floor(Math.random() * allTiles.length)];
                 }
+            }
 
-                let targetTile = null;
-                
-                // 1순위: 접근 가능한 타일
-                if (accessibleTiles.length > 0) {
-                    targetTile = accessibleTiles[Math.floor(Math.random() * accessibleTiles.length)];
-                } 
-                // 2순위: 근처 타일
-                else if (nearbyTiles.length > 0) {
-                    targetTile = nearbyTiles[Math.floor(Math.random() * nearbyTiles.length)];
-                } 
-                // 3순위: 아무 타일
-                else {
-                    const allTiles = Array.from(tiles.values()).filter(t => 
-                        !t.isDeactivated && 
-                        t.colorIndex !== nextMissionIndex &&
-                        (t.gridX !== player.gridX || t.gridY !== player.gridY)
-                    );
-                    if (allTiles.length > 0) {
-                        targetTile = allTiles[Math.floor(Math.random() * allTiles.length)];
-                    }
-                }
-
-                if (targetTile) {
-                    targetTile.colorIndex = nextMissionIndex;
-                    targetTile.mesh.material.color.set(currentThemeColors[nextMissionIndex]);
-                }
+            if (targetTile) {
+                targetTile.colorIndex = colorIndex;
+                targetTile.mesh.material.color.set(currentThemeColors[colorIndex]);
             }
         }
 
@@ -1838,16 +2240,111 @@
 
         function updateMissionUI() {
             missionDisplay.innerHTML = '';
-            const missionsToShow = gameData.currentMission.slice(0, 3);
-            missionsToShow.forEach((colorIndex, index) => {
-                const colorDiv = document.createElement('div');
-                colorDiv.className = 'mission-color';
+            
+            const currentMission = gameData.currentMission[0];
+            if (!currentMission) return;
+            
+            // 미션 타입 표시
+            const typeIndicator = document.createElement('div');
+            typeIndicator.style.cssText = `
+                font-size: 1.2rem; margin-bottom: 5px; color: var(--color-text);
+                text-align: center; font-weight: bold;
+            `;
+            const config = MISSION_CONFIGS[currentMission.type];
+            typeIndicator.textContent = `${config.icon} ${config.name}`;
+            missionDisplay.appendChild(typeIndicator);
+            
+            // 미션별 UI 표시
+            const missionContainer = document.createElement('div');
+            missionContainer.style.cssText = 'display: flex; gap: 6px; align-items: center; justify-content: center;';
+            
+            switch (currentMission.type) {
+                case MISSION_TYPES.SINGLE_COLOR:
+                    createColorIndicator(missionContainer, currentMission.target[0], true);
+                    break;
+                    
+                case MISSION_TYPES.DOUBLE:
+                    currentMission.target.forEach((colorIndex, idx) => {
+                        createColorIndicator(missionContainer, colorIndex, idx === currentMission.progress);
+                    });
+                    break;
+                    
+                case MISSION_TYPES.SEQUENCE:
+                    currentMission.target.forEach((colorIndex, idx) => {
+                        createColorIndicator(missionContainer, colorIndex, idx === currentMission.progress);
+                        if (idx < currentMission.target.length - 1) {
+                            const arrow = document.createElement('div');
+                            arrow.textContent = '→';
+                            arrow.style.color = 'var(--color-text)';
+                            missionContainer.appendChild(arrow);
+                        }
+                    });
+                    break;
+                    
+                case MISSION_TYPES.RAINBOW:
+                    currentMission.target.forEach(colorIndex => {
+                        const isCollected = currentMission.collected.has(colorIndex);
+                        createColorIndicator(missionContainer, colorIndex, !isCollected, isCollected);
+                    });
+                    break;
+                    
+                case MISSION_TYPES.TIME_RUSH:
+                    // 타이머 표시
+                    const elapsed = Date.now() - currentMission.startTime;
+                    const remaining = Math.max(0, currentMission.timeLimit - elapsed);
+                    const timerDiv = document.createElement('div');
+                    timerDiv.style.cssText = `
+                        background: ${remaining < 2000 ? '#ff4444' : '#44ff44'};
+                        color: black; padding: 2px 8px; border-radius: 10px;
+                        font-size: 0.9rem; font-weight: bold; margin-right: 8px;
+                    `;
+                    timerDiv.textContent = `${Math.ceil(remaining / 1000)}s`;
+                    missionContainer.appendChild(timerDiv);
+                    
+                    // 필요한 색상들
+                    currentMission.target.forEach((colorIndex, idx) => {
+                        createColorIndicator(missionContainer, colorIndex, idx === currentMission.progress);
+                    });
+                    break;
+            }
+            
+            // 진행도 표시
+            if (currentMission.maxProgress > 1) {
+                const progressDiv = document.createElement('div');
+                progressDiv.style.cssText = `
+                    font-size: 0.8rem; color: var(--color-text);
+                    margin-top: 3px; text-align: center;
+                `;
+                progressDiv.textContent = `${currentMission.progress}/${currentMission.maxProgress}`;
+                missionDisplay.appendChild(progressDiv);
+            }
+            
+            missionDisplay.appendChild(missionContainer);
+        }
+        
+        function createColorIndicator(container, colorIndex, isCurrent = false, isCompleted = false) {
+            const colorDiv = document.createElement('div');
+            colorDiv.className = 'mission-color';
+            
+            if (isCompleted) {
+                // 완료된 색상은 체크마크 표시
+                colorDiv.style.cssText = `
+                    background: linear-gradient(45deg, #4caf50, #81c784);
+                    border: 3px solid var(--color-text);
+                    display: flex; align-items: center; justify-content: center;
+                    font-size: 1.2rem; color: white;
+                `;
+                colorDiv.textContent = '✓';
+            } else {
                 colorDiv.style.backgroundColor = `#${currentThemeColors[colorIndex].toString(16).padStart(6, '0')}`;
-                if (index === 0) {
+                if (isCurrent) {
                     colorDiv.classList.add('current');
+                } else {
+                    colorDiv.style.opacity = '0.6';
                 }
-                missionDisplay.appendChild(colorDiv);
-            });
+            }
+            
+            container.appendChild(colorDiv);
         }
         
         function updateCamera() {
