@@ -161,6 +161,14 @@
             margin-left: -5px; border: 2px solid var(--color-bg);
         }
 
+        /* 게임 모드 스타일 */
+        .game-mode-item {
+            text-align: center; width: 100%;
+        }
+        .mode-button {
+            width: 100%; margin-bottom: 8px;
+        }
+
         /* 모바일 가상 키보드 스타일 */
         #virtual-keyboard {
             position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
@@ -301,6 +309,7 @@
                 <div class="hud-group">
                     <div id="score-display">Score: 0</div>
                     <div id="combo-display">Combo: x1.0</div>
+                    <div id="perfect-progress" style="display: none;">Progress: 0/50</div>
                 </div>
                 <div class="hud-group" style="display: flex; align-items: center;">
                     <div>
@@ -326,13 +335,15 @@
                 </div>
                 <div style="display: flex; flex-direction: column; gap: 15px; align-items: center;">
                     <button id="start-button" class="ui-button">게임 시작</button>
+                    <button id="game-modes-button" class="ui-button">게임 모드</button>
                     <button id="tutorial-button" class="ui-button">튜토리얼</button>
                     <button id="settings-button" class="ui-button">설정</button>
                 </div>
             </div>
             <div id="game-over-panel" class="ui-panel" style="display: none;">
-                <h1>GAME OVER</h1>
+                <h1 id="game-over-title">GAME OVER</h1>
                 <div class="stats">
+                    <p id="game-mode-result" style="font-size: 1.1rem; margin-bottom: 15px; display: none;"></p>
                     <p>Final Score: <span id="final-score">0</span></p>
                     <p class="new-highscore" style="display: none;">NEW HIGH SCORE!</p>
                     <p>Color Sparks: +<span id="sparks-earned">0</span></p>
@@ -360,6 +371,28 @@
                 <h1>일시정지</h1>
                 <button id="resume-button" class="ui-button">계속하기</button>
                 <button id="home-button" class="ui-button">홈으로</button>
+            </div>
+            <div id="game-modes-panel" class="ui-panel" style="display: none;">
+                <h1>게임 모드</h1>
+                <div style="display: flex; flex-direction: column; gap: 20px; align-items: center; max-width: 400px;">
+                    <div class="game-mode-item">
+                        <button id="classic-mode-button" class="ui-button mode-button">클래식 모드</button>
+                        <p style="font-size: 0.9rem; margin: 8px 0; opacity: 0.8;">기본 게임 모드. 시간이 흐르며 난이도가 점진적으로 증가합니다.</p>
+                    </div>
+                    <div class="game-mode-item">
+                        <button id="time-attack-button" class="ui-button mode-button">타임 어택</button>
+                        <p style="font-size: 0.9rem; margin: 8px 0; opacity: 0.8;">2분 안에 최대한 높은 점수를 달성하세요. 시간 보너스 없음!</p>
+                    </div>
+                    <div class="game-mode-item">
+                        <button id="survival-button" class="ui-button mode-button">서바이벌</button>
+                        <p style="font-size: 0.9rem; margin: 8px 0; opacity: 0.8;">실수하면 즉시 게임 오버! 얼마나 오래 버틸 수 있나요?</p>
+                    </div>
+                    <div class="game-mode-item">
+                        <button id="perfect-button" class="ui-button mode-button">퍼펙트 모드</button>
+                        <p style="font-size: 0.9rem; margin: 8px 0; opacity: 0.8;">연속으로 50개의 타일을 성공해야 승리! 실수는 용납되지 않습니다.</p>
+                    </div>
+                </div>
+                <button id="back-from-modes-button" class="ui-button">뒤로 가기</button>
             </div>
             
             <!-- 튜토리얼 오버레이 -->
@@ -458,6 +491,45 @@
             TIME_PENALTY_PER_MOVE: 1.0,
             TIME_DECAY_RATE: 1.2, // 시간당 추가 감소율
         };
+
+        // 게임 모드 시스템
+        const GAME_MODES = {
+            CLASSIC: 'classic',
+            TIME_ATTACK: 'time_attack',
+            SURVIVAL: 'survival',
+            PERFECT: 'perfect'
+        };
+
+        const GAME_MODE_CONFIG = {
+            [GAME_MODES.CLASSIC]: {
+                name: '클래식 모드',
+                initialTime: 45,
+                timeReward: true,
+                mistakeAllowed: true,
+                winCondition: null
+            },
+            [GAME_MODES.TIME_ATTACK]: {
+                name: '타임 어택',
+                initialTime: 120,
+                timeReward: false,
+                mistakeAllowed: true,
+                winCondition: null
+            },
+            [GAME_MODES.SURVIVAL]: {
+                name: '서바이벌',
+                initialTime: 60,
+                timeReward: true,
+                mistakeAllowed: false,
+                winCondition: null
+            },
+            [GAME_MODES.PERFECT]: {
+                name: '퍼펙트 모드',
+                initialTime: null,
+                timeReward: false,
+                mistakeAllowed: false,
+                winCondition: { type: 'perfect_tiles', target: 50 }
+            }
+        };
         
         let gameState = 'MENU';
         // 보상 시스템 설정
@@ -551,11 +623,16 @@
             missionProgress: [],
             rainbowProgress: new Set(),
             timeRushStartTime: 0,
-            missionStartTime: 0
+            missionStartTime: 0,
+            // 게임 모드 관련 데이터
+            gameMode: GAME_MODES.CLASSIC,
+            perfectTilesCount: 0,
+            gameWon: false
         };
         let gameSettings = {
             theme: '선명한 무지개',
-            showVirtualKeyboard: true
+            showVirtualKeyboard: true,
+            currentGameMode: GAME_MODES.CLASSIC
         };
         
         // 튜토리얼 시스템
@@ -857,9 +934,11 @@
         const mainMenu = document.getElementById('main-menu');
         const gameOverPanel = document.getElementById('game-over-panel');
         const settingsPanel = document.getElementById('settings-panel');
+        const gameModesPanel = document.getElementById('game-modes-panel');
         const pausePanel = document.getElementById('pause-panel');
         const scoreDisplay = document.getElementById('score-display');
         const comboDisplay = document.getElementById('combo-display');
+        const perfectProgress = document.getElementById('perfect-progress');
         const timeDisplay = document.getElementById('time-display');
         const timeBar = document.getElementById('time-bar');
         const missionDisplay = document.getElementById('mission-display');
@@ -867,6 +946,8 @@
         const finalScoreDisplay = document.getElementById('final-score');
         const sparksEarnedDisplay = document.getElementById('sparks-earned');
         const newHighScoreBadge = gameOverPanel.querySelector('.new-highscore');
+        const gameOverTitle = document.getElementById('game-over-title');
+        const gameModeResult = document.getElementById('game-mode-result');
         const virtualKeyboard = document.getElementById('virtual-keyboard');
         const keyboardToggle = document.getElementById('virtual-keyboard-toggle');
         const invincibilityTimer = document.getElementById('invincibility-timer');
@@ -924,6 +1005,14 @@
             addTouchFeedback(document.getElementById('pause-button'), togglePause);
             addTouchFeedback(document.getElementById('resume-button'), togglePause);
             addTouchFeedback(document.getElementById('home-button'), goHome);
+            
+            // 게임 모드 버튼들
+            addTouchFeedback(document.getElementById('game-modes-button'), showGameModesPanel);
+            addTouchFeedback(document.getElementById('back-from-modes-button'), showMainMenu);
+            addTouchFeedback(document.getElementById('classic-mode-button'), () => startGameWithMode(GAME_MODES.CLASSIC));
+            addTouchFeedback(document.getElementById('time-attack-button'), () => startGameWithMode(GAME_MODES.TIME_ATTACK));
+            addTouchFeedback(document.getElementById('survival-button'), () => startGameWithMode(GAME_MODES.SURVIVAL));
+            addTouchFeedback(document.getElementById('perfect-button'), () => startGameWithMode(GAME_MODES.PERFECT));
             
             // 튜토리얼 버튼 이벤트 (터치 피드백 추가)
             addTouchFeedback(tutorialPrevBtn, previousTutorialStep);
@@ -985,6 +1074,7 @@
                 gameData.achievements = parsed.achievements || {};
                 gameSettings.theme = parsed.theme || '선명한 무지개';
                 gameSettings.showVirtualKeyboard = parsed.showVirtualKeyboard !== undefined ? parsed.showVirtualKeyboard : true;
+                gameSettings.currentGameMode = parsed.currentGameMode || GAME_MODES.CLASSIC;
             } else {
                 console.log('저장된 설정이 없음, 기본값 사용');
                 gameSettings.showVirtualKeyboard = true;
@@ -1010,7 +1100,8 @@
                 currentSkin: gameData.currentSkin,
                 achievements: gameData.achievements,
                 theme: gameSettings.theme,
-                showVirtualKeyboard: gameSettings.showVirtualKeyboard
+                showVirtualKeyboard: gameSettings.showVirtualKeyboard,
+                currentGameMode: gameSettings.currentGameMode
             }));
         }
 
@@ -1020,7 +1111,29 @@
         }
         function showMainMenu() {
             settingsPanel.style.display = 'none';
+            gameModesPanel.style.display = 'none';
             mainMenu.style.display = 'flex';
+        }
+        
+        function showGameModesPanel() {
+            mainMenu.style.display = 'none';
+            gameModesPanel.style.display = 'flex';
+        }
+        
+        function startGameWithMode(mode) {
+            gameData.gameMode = mode;
+            gameSettings.currentGameMode = mode;
+            
+            // 모드별 초기화
+            const modeConfig = GAME_MODE_CONFIG[mode];
+            if (modeConfig.initialTime !== null) {
+                gameData.time = modeConfig.initialTime;
+            }
+            gameData.perfectTilesCount = 0;
+            gameData.gameWon = false;
+            
+            // 게임 시작
+            startGame();
         }
         function setupSettingsPanel() {
             const container = document.getElementById('theme-container');
@@ -1505,12 +1618,16 @@
             mainMenu.style.display = 'none';
             gameOverPanel.style.display = 'none';
             pausePanel.style.display = 'none';
+            gameModesPanel.style.display = 'none';
             hud.style.display = 'flex';
             missionDisplay.style.display = 'flex';
             document.getElementById('pause-button').textContent = '||';
 
             gameData.score = 0;
-            gameData.time = GAME_CONFIG.INITIAL_TIME;
+            // 게임 모드에 따른 시간 설정 (startGameWithMode에서 이미 설정된 경우 유지)
+            if (gameData.gameMode === GAME_MODES.CLASSIC) {
+                gameData.time = GAME_CONFIG.INITIAL_TIME;
+            }
             gameData.combo = 1;
             gameData.currentMission = [];
             
@@ -1569,6 +1686,9 @@
             missionDisplay.style.display = 'none';
             gameOverPanel.style.display = 'flex';
 
+            // 게임 모드별 결과 표시
+            updateGameOverDisplay();
+
             finalScoreDisplay.textContent = gameData.score.toLocaleString();
             if (gameData.score > gameData.highScore) {
                 gameData.highScore = gameData.score;
@@ -1587,6 +1707,47 @@
             saveGameData();
             highScoreDisplay.textContent = gameData.highScore.toLocaleString();
             updateVirtualKeyboard();
+        }
+
+        function updateGameOverDisplay() {
+            const modeConfig = GAME_MODE_CONFIG[gameData.gameMode];
+            
+            if (gameData.gameWon) {
+                // 승리 메시지
+                gameOverTitle.textContent = '미션 완성!';
+                gameOverTitle.style.color = '#4caf50';
+                
+                if (gameData.gameMode === GAME_MODES.PERFECT) {
+                    gameModeResult.textContent = `퍼펙트 모드 클리어! ${gameData.perfectTilesCount}개 연속 성공!`;
+                    gameModeResult.style.display = 'block';
+                    gameModeResult.style.color = '#4caf50';
+                }
+            } else {
+                // 실패 메시지
+                gameOverTitle.textContent = 'GAME OVER';
+                gameOverTitle.style.color = '#e0e0e0';
+                
+                let resultText = '';
+                switch (gameData.gameMode) {
+                    case GAME_MODES.TIME_ATTACK:
+                        resultText = '타임 어택 모드 종료';
+                        break;
+                    case GAME_MODES.SURVIVAL:
+                        const survived = Math.floor(GAME_MODE_CONFIG[GAME_MODES.SURVIVAL].initialTime - gameData.time);
+                        resultText = `서바이벌 모드: ${survived}초 생존`;
+                        break;
+                    case GAME_MODES.PERFECT:
+                        resultText = `퍼펙트 모드: ${gameData.perfectTilesCount}/${GAME_MODE_CONFIG[GAME_MODES.PERFECT].winCondition.target}개 성공`;
+                        break;
+                    case GAME_MODES.CLASSIC:
+                        gameModeResult.style.display = 'none';
+                        return;
+                }
+                
+                gameModeResult.textContent = resultText;
+                gameModeResult.style.display = 'block';
+                gameModeResult.style.color = '#e0e0e0';
+            }
         }
 
         function update(deltaTime) {
@@ -1630,8 +1791,31 @@
             scoreDisplay.textContent = `Score: ${gameData.score.toLocaleString()}`;
             const comboBonus = 1.0 + (gameData.combo - 1) * GAME_CONFIG.COMBO_MULTIPLIER;
             comboDisplay.textContent = `Combo: x${Math.min(comboBonus, GAME_CONFIG.MAX_COMBO_BONUS).toFixed(1)}`;
-            timeDisplay.textContent = `Time: ${gameData.time.toFixed(1)}`;
-            timeBar.style.width = `${(gameData.time / GAME_CONFIG.INITIAL_TIME) * 100}%`;
+            
+            // 퍼펙트 모드 진행도 표시
+            if (gameData.gameMode === GAME_MODES.PERFECT) {
+                perfectProgress.style.display = 'block';
+                perfectProgress.textContent = `Progress: ${gameData.perfectTilesCount}/${GAME_MODE_CONFIG[GAME_MODES.PERFECT].winCondition.target}`;
+            } else {
+                perfectProgress.style.display = 'none';
+            }
+            
+            // 퍼펙트 모드에서는 시간 표시 숨기기
+            if (gameData.gameMode === GAME_MODES.PERFECT) {
+                timeDisplay.parentElement.style.display = 'none';
+            } else {
+                timeDisplay.parentElement.style.display = 'block';
+                timeDisplay.textContent = `Time: ${gameData.time.toFixed(1)}`;
+                
+                // 시간 바 표시 (게임 모드에 따라 다른 기준 사용)
+                let maxTime = GAME_CONFIG.INITIAL_TIME;
+                if (gameData.gameMode === GAME_MODES.TIME_ATTACK) {
+                    maxTime = GAME_MODE_CONFIG[GAME_MODES.TIME_ATTACK].initialTime;
+                } else if (gameData.gameMode === GAME_MODES.SURVIVAL) {
+                    maxTime = GAME_MODE_CONFIG[GAME_MODES.SURVIVAL].initialTime;
+                }
+                timeBar.style.width = `${(gameData.time / maxTime) * 100}%`;
+            }
         }
         
         function createPlayer() {
@@ -1747,9 +1931,24 @@
                 // 타일 성공 효과
                 triggerTileSuccessEffect(player.mesh.position);
                 
-                // 튜토리얼 상태가 아닐 때만 시간 업데이트
+                // 게임 모드별 시간 보상 처리
                 if (gameState !== 'TUTORIAL') {
-                    gameData.time += GAME_CONFIG.TIME_REWARD_BASE * scoreMultiplier;
+                    const modeConfig = GAME_MODE_CONFIG[gameData.gameMode];
+                    if (modeConfig.timeReward) {
+                        gameData.time += GAME_CONFIG.TIME_REWARD_BASE * scoreMultiplier;
+                    }
+                }
+                
+                // 퍼펙트 모드 진행도 업데이트
+                if (gameData.gameMode === GAME_MODES.PERFECT) {
+                    gameData.perfectTilesCount++;
+                    
+                    // 퍼펙트 모드 승리 조건 체크
+                    if (gameData.perfectTilesCount >= GAME_MODE_CONFIG[GAME_MODES.PERFECT].winCondition.target) {
+                        gameData.gameWon = true;
+                        gameOver(); // 승리로 게임 종료
+                        return;
+                    }
                 }
                 
                 // 튜토리얼 상태에서 올바른 타일 밟기 완료 표시
@@ -1777,9 +1976,22 @@
                 vibrate([200, 100, 200]);
                 gameData.combo = 1;
                 
+                // 게임 모드별 실패 처리
+                const modeConfig = GAME_MODE_CONFIG[gameData.gameMode];
+                if (!modeConfig.mistakeAllowed && gameState !== 'TUTORIAL') {
+                    // 서바이벌 및 퍼펙트 모드: 실수 시 즉시 게임 오버
+                    gameOver();
+                    return;
+                }
+                
                 // 미션 실패 시 진행도 리셋 (특정 미션 타입)
                 if (result.resetProgress) {
                     resetCurrentMissionProgress();
+                }
+                
+                // 퍼펙트 모드가 아닐 때만 진행도 리셋
+                if (gameData.gameMode === GAME_MODES.PERFECT) {
+                    gameData.perfectTilesCount = 0; // 퍼펙트 모드에서 실수 시 진행도 리셋
                 }
                 
                 // 튜토리얼 상태가 아닐 때만 시간 페널티
